@@ -1,0 +1,53 @@
+package onec
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"time"
+)
+
+// Client is an HTTP client for communicating with 1C:Enterprise.
+type Client struct {
+	BaseURL    string
+	HTTPClient *http.Client
+}
+
+// NewClient creates a client for 1C HTTP service.
+func NewClient(baseURL string) *Client {
+	return &Client{
+		BaseURL: baseURL,
+		HTTPClient: &http.Client{
+			Timeout: 30 * time.Second,
+		},
+	}
+}
+
+// Get performs a GET request to a 1C endpoint and decodes the JSON response.
+func (c *Client) Get(ctx context.Context, endpoint string, result any) error {
+	url := c.BaseURL + endpoint
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return fmt.Errorf("creating request: %w", err)
+	}
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("executing request to 1C: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("1C returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(result); err != nil {
+		return fmt.Errorf("decoding 1C response: %w", err)
+	}
+
+	return nil
+}
