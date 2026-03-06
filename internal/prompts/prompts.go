@@ -106,9 +106,25 @@ func RegisterAll(s *mcp.Server) {
 	}
 }
 
+// requiredArg extracts a required argument from the prompt request,
+// returning an error if it is missing or empty.
+func requiredArg(req *mcp.GetPromptRequest, name string) (string, error) {
+	v := req.Params.Arguments[name]
+	if v == "" {
+		return "", fmt.Errorf("missing required argument %q", name)
+	}
+	return v, nil
+}
+
 func handleReviewModule(_ context.Context, req *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
-	objectType := req.Params.Arguments["object_type"]
-	objectName := req.Params.Arguments["object_name"]
+	objectType, err := requiredArg(req, "object_type")
+	if err != nil {
+		return nil, err
+	}
+	objectName, err := requiredArg(req, "object_name")
+	if err != nil {
+		return nil, err
+	}
 
 	return &mcp.GetPromptResult{
 		Description: fmt.Sprintf("Ревью модуля %s.%s", objectType, objectName),
@@ -134,7 +150,10 @@ func handleReviewModule(_ context.Context, req *mcp.GetPromptRequest) (*mcp.GetP
 }
 
 func handleWritePosting(_ context.Context, req *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
-	documentName := req.Params.Arguments["document_name"]
+	documentName, err := requiredArg(req, "document_name")
+	if err != nil {
+		return nil, err
+	}
 
 	return &mcp.GetPromptResult{
 		Description: fmt.Sprintf("Обработка проведения документа %s", documentName),
@@ -160,7 +179,10 @@ func handleWritePosting(_ context.Context, req *mcp.GetPromptRequest) (*mcp.GetP
 }
 
 func handleOptimizeQuery(_ context.Context, req *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
-	query := req.Params.Arguments["query"]
+	query, err := requiredArg(req, "query")
+	if err != nil {
+		return nil, err
+	}
 
 	return &mcp.GetPromptResult{
 		Description: "Оптимизация запроса 1С",
@@ -215,7 +237,10 @@ func handleExplainConfig(_ context.Context, _ *mcp.GetPromptRequest) (*mcp.GetPr
 }
 
 func handleAnalyzeError(_ context.Context, req *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
-	errorText := req.Params.Arguments["error_text"]
+	errorText, err := requiredArg(req, "error_text")
+	if err != nil {
+		return nil, err
+	}
 
 	return &mcp.GetPromptResult{
 		Description: "Анализ ошибки 1С",
@@ -243,8 +268,14 @@ func handleAnalyzeError(_ context.Context, req *mcp.GetPromptRequest) (*mcp.GetP
 }
 
 func handleFindDuplicates(_ context.Context, req *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
-	objectType := req.Params.Arguments["object_type"]
-	objectName := req.Params.Arguments["object_name"]
+	objectType, err := requiredArg(req, "object_type")
+	if err != nil {
+		return nil, err
+	}
+	objectName, err := requiredArg(req, "object_name")
+	if err != nil {
+		return nil, err
+	}
 
 	return &mcp.GetPromptResult{
 		Description: fmt.Sprintf("Поиск дублей в модуле %s.%s", objectType, objectName),
@@ -272,7 +303,10 @@ func handleFindDuplicates(_ context.Context, req *mcp.GetPromptRequest) (*mcp.Ge
 }
 
 func handleWriteReport(_ context.Context, req *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
-	description := req.Params.Arguments["description"]
+	description, err := requiredArg(req, "description")
+	if err != nil {
+		return nil, err
+	}
 
 	return &mcp.GetPromptResult{
 		Description: "Помощь с написанием отчёта 1С",
@@ -299,8 +333,14 @@ func handleWriteReport(_ context.Context, req *mcp.GetPromptRequest) (*mcp.GetPr
 }
 
 func handleExplainObject(_ context.Context, req *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
-	objectType := req.Params.Arguments["object_type"]
-	objectName := req.Params.Arguments["object_name"]
+	objectType, err := requiredArg(req, "object_type")
+	if err != nil {
+		return nil, err
+	}
+	objectName, err := requiredArg(req, "object_name")
+	if err != nil {
+		return nil, err
+	}
 
 	return &mcp.GetPromptResult{
 		Description: fmt.Sprintf("Объяснение объекта %s.%s", objectType, objectName),

@@ -2,6 +2,7 @@ package prompts
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -176,22 +177,9 @@ func TestPromptHandlers(t *testing.T) {
 				t.Errorf("text content too short (%d chars), expected detailed instructions", len(tc.Text))
 			}
 
-			if !containsSubstring(tc.Text, tt.wantKeyword) {
+			if !strings.Contains(tc.Text, tt.wantKeyword) {
 				t.Errorf("text content does not contain expected keyword %q:\n%s", tt.wantKeyword, tc.Text)
 			}
 		})
 	}
-}
-
-func containsSubstring(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && contains(s, substr))
-}
-
-func contains(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }
