@@ -67,3 +67,32 @@ type SearchMatch struct {
 	Line    int    `json:"line"`
 	Context string `json:"context"`
 }
+
+// FormStructure represents the structure of a 1C form.
+type FormStructure struct {
+	Name     string        `json:"Имя"`
+	Title    string        `json:"Заголовок"`
+	Elements []FormElement `json:"Элементы"`
+	Commands []FormCommand `json:"Команды,omitempty"`
+	Handlers []FormHandler `json:"Обработчики,omitempty"`
+}
+
+// FormElement represents an element on a 1C form.
+type FormElement struct {
+	Name     string `json:"Имя"`
+	Type     string `json:"Тип"`
+	Title    string `json:"Заголовок,omitempty"`
+	DataPath string `json:"ПутьКДанным,omitempty"`
+}
+
+// FormCommand represents a form command.
+type FormCommand struct {
+	Name   string `json:"Имя"`
+	Action string `json:"Действие"`
+}
+
+// FormHandler represents an event handler on a form.
+type FormHandler struct {
+	Event   string `json:"Событие"`
+	Handler string `json:"Обработчик"`
+}
