@@ -32,3 +32,10 @@ type TabularPart struct {
 	Name       string      `json:"Имя"`
 	Attributes []Attribute `json:"Реквизиты"`
 }
+
+// ModuleCode represents the source code of a 1C module.
+type ModuleCode struct {
+	Name       string `json:"Имя"`
+	ModuleKind string `json:"ВидМодуля"`
+	Code       string `json:"Код"`
+}
