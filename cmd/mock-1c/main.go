@@ -180,6 +180,12 @@ var (
 	}
 )
 
+// isSelectQuery checks if a query starts with SELECT/ВЫБРАТЬ keyword.
+func isSelectQuery(query string) bool {
+	upper := strings.ToUpper(strings.TrimSpace(query))
+	return strings.HasPrefix(upper, "ВЫБРАТЬ") || strings.HasPrefix(upper, "SELECT")
+}
+
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
@@ -265,8 +271,7 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	upper := strings.ToUpper(strings.TrimSpace(req.Query))
-	if !strings.HasPrefix(upper, "ВЫБРАТЬ") && !strings.HasPrefix(upper, "SELECT") {
+	if !isSelectQuery(req.Query) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Only SELECT queries allowed"})
 		return
 	}
@@ -364,8 +369,7 @@ func handleValidateQuery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	upper := strings.ToUpper(strings.TrimSpace(req.Query))
-	if strings.HasPrefix(upper, "ВЫБРАТЬ") || strings.HasPrefix(upper, "SELECT") {
+	if isSelectQuery(req.Query) {
 		writeJSON(w, http.StatusOK, map[string]any{"valid": true})
 	} else {
 		writeJSON(w, http.StatusOK, map[string]any{

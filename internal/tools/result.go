@@ -17,6 +17,12 @@ type objectInput struct {
 	ObjectName string `json:"object_name"`
 }
 
+// queryLimitInput is the common input for tools that accept a query string with an optional limit.
+type queryLimitInput struct {
+	Query string `json:"query"`
+	Limit int    `json:"limit"`
+}
+
 // clampLimit normalises a user-supplied limit to [defaultVal, maxVal].
 func clampLimit(value, defaultVal, maxVal int) int {
 	if value <= 0 {

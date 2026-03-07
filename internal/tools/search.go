@@ -15,11 +15,6 @@ const (
 	maxSearchLimit     = 500
 )
 
-type searchInput struct {
-	Query string `json:"query"`
-	Limit int    `json:"limit"`
-}
-
 // SearchCodeTool returns the MCP tool definition for search_code.
 func SearchCodeTool() *mcp.Tool {
 	return &mcp.Tool{
@@ -46,7 +41,7 @@ func SearchCodeTool() *mcp.Tool {
 // NewSearchCodeHandler returns a ToolHandler that searches code across 1C modules.
 func NewSearchCodeHandler(client *onec.Client) mcp.ToolHandler {
 	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		var input searchInput
+		var input queryLimitInput
 		if err := json.Unmarshal(req.Params.Arguments, &input); err != nil {
 			return nil, fmt.Errorf("parsing input: %w", err)
 		}

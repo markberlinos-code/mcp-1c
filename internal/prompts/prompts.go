@@ -119,6 +119,20 @@ func requiredArg(req *mcp.GetPromptRequest, name string) (string, error) {
 	return v, nil
 }
 
+// requiredObjectArgs extracts the object_type and object_name arguments common to
+// several prompts (review_module, find_duplicates, explain_object).
+func requiredObjectArgs(req *mcp.GetPromptRequest) (objectType, objectName string, err error) {
+	objectType, err = requiredArg(req, "object_type")
+	if err != nil {
+		return "", "", err
+	}
+	objectName, err = requiredArg(req, "object_name")
+	if err != nil {
+		return "", "", err
+	}
+	return objectType, objectName, nil
+}
+
 // promptResult constructs a standard prompt result with a single user message.
 func promptResult(description, text string) (*mcp.GetPromptResult, error) {
 	return &mcp.GetPromptResult{
@@ -133,11 +147,7 @@ func promptResult(description, text string) (*mcp.GetPromptResult, error) {
 }
 
 func handleReviewModule(_ context.Context, req *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
-	objectType, err := requiredArg(req, "object_type")
-	if err != nil {
-		return nil, err
-	}
-	objectName, err := requiredArg(req, "object_name")
+	objectType, objectName, err := requiredObjectArgs(req)
 	if err != nil {
 		return nil, err
 	}
@@ -259,11 +269,7 @@ func handleAnalyzeError(_ context.Context, req *mcp.GetPromptRequest) (*mcp.GetP
 }
 
 func handleFindDuplicates(_ context.Context, req *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
-	objectType, err := requiredArg(req, "object_type")
-	if err != nil {
-		return nil, err
-	}
-	objectName, err := requiredArg(req, "object_name")
+	objectType, objectName, err := requiredObjectArgs(req)
 	if err != nil {
 		return nil, err
 	}
@@ -314,11 +320,7 @@ func handleWriteReport(_ context.Context, req *mcp.GetPromptRequest) (*mcp.GetPr
 }
 
 func handleExplainObject(_ context.Context, req *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
-	objectType, err := requiredArg(req, "object_type")
-	if err != nil {
-		return nil, err
-	}
-	objectName, err := requiredArg(req, "object_name")
+	objectType, objectName, err := requiredObjectArgs(req)
 	if err != nil {
 		return nil, err
 	}

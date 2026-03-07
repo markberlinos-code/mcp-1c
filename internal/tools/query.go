@@ -16,10 +16,6 @@ const (
 	maxQueryLimit     = 1000
 )
 
-type queryInput struct {
-	Query string `json:"query"`
-	Limit int    `json:"limit"`
-}
 
 // QueryTool returns the MCP tool definition for execute_query.
 func QueryTool() *mcp.Tool {
@@ -46,7 +42,7 @@ func QueryTool() *mcp.Tool {
 // NewQueryHandler returns a ToolHandler that executes a read-only query in 1C.
 func NewQueryHandler(client *onec.Client) mcp.ToolHandler {
 	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		var input queryInput
+		var input queryLimitInput
 		if err := json.Unmarshal(req.Params.Arguments, &input); err != nil {
 			return nil, fmt.Errorf("parsing input: %w", err)
 		}
