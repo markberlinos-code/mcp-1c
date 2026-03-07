@@ -379,6 +379,72 @@ func handleValidateQuery(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func handleEventLog(w http.ResponseWriter, r *http.Request) {
+	log.Printf("%s %s", r.Method, r.URL.Path)
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "POST required"})
+		return
+	}
+
+	var req struct {
+		Level string `json:"level"`
+		Limit int    `json:"limit"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid JSON body"})
+		return
+	}
+
+	events := []map[string]any{
+		{
+			"date":     "2026-03-07T14:30:00",
+			"level":    "Ошибка",
+			"event":    "Данные.Запись",
+			"user":     "Администратор",
+			"metadata": "Документ.РеализацияТоваровУслуг",
+			"comment":  "Ошибка при записи: поле Контрагент не заполнено",
+		},
+		{
+			"date":     "2026-03-07T14:25:00",
+			"level":    "Предупреждение",
+			"event":    "Данные.Проведение",
+			"user":     "Бухгалтер",
+			"metadata": "Документ.ПоступлениеТоваровУслуг",
+			"comment":  "Отрицательный остаток по регистру ТоварыНаСкладах",
+		},
+		{
+			"date":  "2026-03-07T14:00:00",
+			"level": "Информация",
+			"event": "Сеанс.Начало",
+			"user":  "Администратор",
+		},
+	}
+
+	if req.Level != "" {
+		var filtered []map[string]any
+		for _, e := range events {
+			if e["level"] == req.Level {
+				filtered = append(filtered, e)
+			}
+		}
+		events = filtered
+	}
+
+	total := len(events)
+	limit := req.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit < total {
+		events = events[:limit]
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"events": events,
+		"total":  total,
+	})
+}
+
 func handleVersion(w http.ResponseWriter, r *http.Request) {
 	log.Printf("%s %s", r.Method, r.URL.Path)
 	writeJSON(w, http.StatusOK, map[string]string{"version": "0.2.0"})
@@ -399,6 +465,7 @@ func main() {
 	mux.HandleFunc("/mcp/search", handleSearch)
 	mux.HandleFunc("/mcp/form/", handleForm)
 	mux.HandleFunc("/mcp/validate-query", handleValidateQuery)
+	mux.HandleFunc("/mcp/eventlog", handleEventLog)
 	mux.HandleFunc("/mcp/version", handleVersion)
 
 	addr := fmt.Sprintf(":%d", *port)

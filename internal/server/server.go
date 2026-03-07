@@ -23,6 +23,7 @@ func New(onecClient *onec.Client) *mcp.Server {
 	s.AddTool(tools.SearchCodeTool(), tools.NewSearchCodeHandler(onecClient))
 	s.AddTool(tools.FormStructureTool(), tools.NewFormStructureHandler(onecClient))
 	s.AddTool(tools.ValidateQueryTool(), tools.NewValidateQueryHandler(onecClient))
+	s.AddTool(tools.EventLogTool(), tools.NewEventLogHandler(onecClient))
 	tools.RegisterBSLHelp(s)
 	prompts.RegisterAll(s)
 	return s

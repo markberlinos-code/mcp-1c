@@ -159,6 +159,33 @@ func mock1CHandler() http.Handler {
 		})
 	})
 
+	mux.HandleFunc("/eventlog", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		json.NewEncoder(w).Encode(map[string]any{
+			"events": []map[string]any{
+				{
+					"date":     "2026-03-07T10:00:00",
+					"level":    "Ошибка",
+					"event":    "Данные.Запись",
+					"user":     "Администратор",
+					"metadata": "Документ.РеализацияТоваровУслуг",
+					"comment":  "Ошибка при записи документа",
+				},
+				{
+					"date":  "2026-03-07T09:30:00",
+					"level": "Информация",
+					"event": "Сеанс.Начало",
+					"user":  "Бухгалтер",
+				},
+			},
+			"total": 2,
+		})
+	})
+
 	mux.HandleFunc("/validate-query", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			w.WriteHeader(http.StatusMethodNotAllowed)
@@ -233,6 +260,7 @@ func TestIntegration_ListTools(t *testing.T) {
 		"get_metadata_tree", "get_object_structure", "bsl_syntax_help",
 		"get_module_code", "execute_query",
 		"search_code", "get_form_structure", "validate_query",
+		"get_event_log",
 	}
 	for _, want := range expected {
 		if !toolNames[want] {
@@ -588,6 +616,39 @@ func TestIntegration_ValidateQuery_Valid(t *testing.T) {
 	text := result.Content[0].(*mcp.TextContent).Text
 	if !strings.Contains(text, "корректен") {
 		t.Errorf("expected 'корректен' in response for valid query, got:\n%s", text)
+	}
+}
+
+func TestIntegration_GetEventLog(t *testing.T) {
+	session, cleanup := setupIntegration(t)
+	defer cleanup()
+
+	result, err := session.CallTool(context.Background(), &mcp.CallToolParams{
+		Name: "get_event_log",
+		Arguments: map[string]any{
+			"level": "Ошибка",
+			"limit": 10,
+		},
+	})
+	if err != nil {
+		t.Fatalf("CallTool error: %v", err)
+	}
+	if len(result.Content) == 0 {
+		t.Fatal("expected non-empty content")
+	}
+
+	text := result.Content[0].(*mcp.TextContent).Text
+	for _, want := range []string{
+		"Журнал регистрации",
+		"Ошибка",
+		"Администратор",
+		"РеализацияТоваровУслуг",
+		"Информация",
+		"Бухгалтер",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("expected %q in response, got:\n%s", want, text)
+		}
 	}
 }
 

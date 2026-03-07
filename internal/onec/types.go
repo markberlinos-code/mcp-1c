@@ -107,3 +107,31 @@ type ValidateQueryResult struct {
 	Valid  bool     `json:"valid"`
 	Errors []string `json:"errors,omitempty"`
 }
+
+// EventLogRequest is the request body for the eventlog endpoint.
+type EventLogRequest struct {
+	StartDate string `json:"start_date,omitempty"`
+	EndDate   string `json:"end_date,omitempty"`
+	Level     string `json:"level,omitempty"`
+	User      string `json:"user,omitempty"`
+	Limit     int    `json:"limit,omitempty"`
+}
+
+// EventLogResult is the response from the eventlog endpoint.
+type EventLogResult struct {
+	Events []EventLogEntry `json:"events"`
+	Total  int             `json:"total"`
+}
+
+// EventLogEntry represents a single event log record.
+type EventLogEntry struct {
+	Date        string `json:"date"`
+	Level       string `json:"level"`
+	Event       string `json:"event"`
+	User        string `json:"user"`
+	Computer    string `json:"computer,omitempty"`
+	Metadata    string `json:"metadata,omitempty"`
+	Data        string `json:"data,omitempty"`
+	Comment     string `json:"comment,omitempty"`
+	Transaction string `json:"transaction,omitempty"`
+}
