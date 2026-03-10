@@ -83,8 +83,11 @@ mcp-1c --install ~/Documents/InfoBase
 | `--base` | `MCP_1C_BASE_URL` | `http://localhost:8080/hs/mcp` | URL HTTP-сервиса 1С |
 | `--user` | `MCP_1C_USER` | — | Пользователь HTTP-сервиса |
 | `--password` | `MCP_1C_PASSWORD` | — | Пароль HTTP-сервиса |
+| `--dump` | — | — | Путь к выгрузке конфигурации (DumpConfigToFiles), включает инструмент search_code |
 | `--install` | — | — | Установить расширение в базу 1С по указанному пути |
 | `--platform` | — | — | Путь к бинарнику 1С (автоопределение, если не указан) |
+| `--db-user` | — | — | Пользователь базы 1С для DESIGNER (режим --install) |
+| `--db-password` | — | — | Пароль базы 1С для DESIGNER (режим --install) |
 
 ## Разработка
 
