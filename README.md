@@ -58,6 +58,8 @@ mcp-1c --install ~/Documents/InfoBase
 
 Перезапустите AI-клиент. В Claude Desktop рекомендуем: **«+» → Connectors → Tool access → Always available**.
 
+> Также поддерживаются: **Claude Code**, **Cursor**, **Windsurf**, **VS Code + Copilot**, **VS Code + Continue**, **JetBrains IDE**. Настройка каждого — в [пошаговой инструкции](docs/getting-started.md#шаг-4-настроить-ai-клиент).
+
 Спросите: **«Покажи структуру конфигурации моей базы 1С»**
 
 ## Доступные инструменты

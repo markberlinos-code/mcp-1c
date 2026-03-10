@@ -24,7 +24,15 @@ func New(onecClient *onec.Client, dumpSearcher *dump.Searcher) *mcp.Server {
 	if dumpSearcher != nil {
 		s.AddTool(tools.SearchCodeTool(), tools.NewSearchCodeHandler(dumpSearcher))
 	}
-	s.AddTool(tools.FormStructureTool(), tools.NewFormStructureHandler(onecClient))
+
+	// Pass dump directory to form handler so it can enrich the HTTP response
+	// with data from Form.xml files parsed from the dump.
+	var dumpDir string
+	if dumpSearcher != nil {
+		dumpDir = dumpSearcher.Dir()
+	}
+	s.AddTool(tools.FormStructureTool(), tools.NewFormStructureHandler(onecClient, dumpDir))
+
 	s.AddTool(tools.ValidateQueryTool(), tools.NewValidateQueryHandler(onecClient))
 	s.AddTool(tools.EventLogTool(), tools.NewEventLogHandler(onecClient))
 	s.AddTool(tools.ConfigurationInfoTool(), tools.NewConfigurationInfoHandler(onecClient))

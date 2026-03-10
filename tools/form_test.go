@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -141,7 +143,7 @@ func TestNewFormStructureHandler(t *testing.T) {
 	defer mockServer.Close()
 
 	client := onec.NewClient(mockServer.URL, "", "")
-	handler := NewFormStructureHandler(client)
+	handler := NewFormStructureHandler(client, "")
 
 	args, _ := json.Marshal(map[string]any{
 		"object_type": "Document",
@@ -185,4 +187,194 @@ func TestNewFormStructureHandler(t *testing.T) {
 			t.Errorf("expected text to contain %q, got:\n%s", want, tc.Text)
 		}
 	}
+}
+
+func TestNewFormStructureHandler_DumpFallback(t *testing.T) {
+	// Mock server that returns empty elements/commands/handlers
+	// (simulates Enterprise mode limitation).
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"name":     "ФормаДокумента",
+			"title":    "Реализация товаров и услуг",
+			"elements": []any{},
+			"commands": []any{},
+			"handlers": []any{},
+		})
+	}))
+	defer mockServer.Close()
+
+	// Create dump directory with a Form.xml.
+	dumpDir := t.TempDir()
+	formXMLDir := filepath.Join(dumpDir, "Documents", "РеализацияТоваровУслуг", "Forms", "ФормаДокумента", "Ext")
+	if err := os.MkdirAll(formXMLDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	formXML := sampleFormXML()
+	if err := os.WriteFile(filepath.Join(formXMLDir, "Form.xml"), []byte(formXML), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	client := onec.NewClient(mockServer.URL, "", "")
+	handler := NewFormStructureHandler(client, dumpDir)
+
+	args, _ := json.Marshal(map[string]any{
+		"object_type": "Document",
+		"object_name": "РеализацияТоваровУслуг",
+	})
+	req := &mcp.CallToolRequest{
+		Params: &mcp.CallToolParamsRaw{
+			Name:      "get_form_structure",
+			Arguments: args,
+		},
+	}
+
+	result, err := handler(context.Background(), req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	tc := result.Content[0].(*mcp.TextContent)
+
+	// The form name should come from the HTTP response.
+	if !strings.Contains(tc.Text, "ФормаДокумента") {
+		t.Errorf("expected form name from HTTP, got:\n%s", tc.Text)
+	}
+
+	// Elements, commands, handlers should come from the dump.
+	for _, want := range []string{
+		"## Элементы формы",
+		"Контрагент",
+		"Объект.Контрагент",
+		"## Команды формы",
+		"Провести",
+		"## Обработчики событий",
+		"ПриОткрытии",
+	} {
+		if !strings.Contains(tc.Text, want) {
+			t.Errorf("expected text to contain %q from dump fallback, got:\n%s", want, tc.Text)
+		}
+	}
+}
+
+func TestNewFormStructureHandler_DumpOnly(t *testing.T) {
+	// Mock server that returns 500 error.
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+	}))
+	defer mockServer.Close()
+
+	// Create dump directory with a Form.xml.
+	dumpDir := t.TempDir()
+	formXMLDir := filepath.Join(dumpDir, "Documents", "РеализацияТоваровУслуг", "Forms", "ФормаДокумента", "Ext")
+	if err := os.MkdirAll(formXMLDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(formXMLDir, "Form.xml"), []byte(sampleFormXML()), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	client := onec.NewClient(mockServer.URL, "", "")
+	handler := NewFormStructureHandler(client, dumpDir)
+
+	args, _ := json.Marshal(map[string]any{
+		"object_type": "Document",
+		"object_name": "РеализацияТоваровУслуг",
+	})
+	req := &mcp.CallToolRequest{
+		Params: &mcp.CallToolParamsRaw{
+			Name:      "get_form_structure",
+			Arguments: args,
+		},
+	}
+
+	result, err := handler(context.Background(), req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	tc := result.Content[0].(*mcp.TextContent)
+
+	// Form name comes from the dump directory name.
+	if !strings.Contains(tc.Text, "ФормаДокумента") {
+		t.Errorf("expected form name, got:\n%s", tc.Text)
+	}
+
+	// All sections should be populated from the dump.
+	for _, want := range []string{
+		"Контрагент",
+		"ПолеВвода",
+		"Провести",
+		"ПриОткрытии",
+	} {
+		if !strings.Contains(tc.Text, want) {
+			t.Errorf("expected text to contain %q, got:\n%s", want, tc.Text)
+		}
+	}
+}
+
+// sampleFormXML returns a minimal 1C form XML for testing.
+func sampleFormXML() string {
+	return `<?xml version="1.0" encoding="UTF-8"?>
+<Form xmlns="http://v8.1c.ru/8.3/xcf/logform"
+      xmlns:v8="http://v8.1c.ru/8.1/data/core">
+  <Title>
+    <v8:item>
+      <v8:lang>ru</v8:lang>
+      <v8:content>Реализация товаров и услуг</v8:content>
+    </v8:item>
+  </Title>
+  <Elements>
+    <InputField>
+      <Name>Контрагент</Name>
+      <Title>
+        <v8:item>
+          <v8:lang>ru</v8:lang>
+          <v8:content>Контрагент</v8:content>
+        </v8:item>
+      </Title>
+      <DataPath>Объект.Контрагент</DataPath>
+    </InputField>
+    <InputField>
+      <Name>СуммаДокумента</Name>
+      <Title>
+        <v8:item>
+          <v8:lang>ru</v8:lang>
+          <v8:content>Сумма</v8:content>
+        </v8:item>
+      </Title>
+      <DataPath>Объект.СуммаДокумента</DataPath>
+    </InputField>
+    <Table>
+      <Name>Товары</Name>
+      <Title>
+        <v8:item>
+          <v8:lang>ru</v8:lang>
+          <v8:content>Товары</v8:content>
+        </v8:item>
+      </Title>
+      <DataPath>Объект.Товары</DataPath>
+    </Table>
+  </Elements>
+  <Commands>
+    <Command>
+      <Name>Провести</Name>
+      <Action>Провести</Action>
+    </Command>
+    <Command>
+      <Name>ПечатьНакладной</Name>
+      <Action>ПечатьНакладной</Action>
+    </Command>
+  </Commands>
+  <Handlers>
+    <Event>
+      <Name>ПриОткрытии</Name>
+      <Handler>ПриОткрытии</Handler>
+    </Event>
+    <Event>
+      <Name>ПередЗаписью</Name>
+      <Handler>ПередЗаписью</Handler>
+    </Event>
+  </Handlers>
+</Form>`
 }
