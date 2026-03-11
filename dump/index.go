@@ -7,10 +7,12 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"runtime/debug"
 	"strings"
 	"sync"
 
 	"github.com/blevesearch/bleve/v2"
+	_ "github.com/blevesearch/bleve/v2/index/scorch"
 	"github.com/blevesearch/bleve/v2/search/query"
 )
 
@@ -223,15 +225,19 @@ func NewIndex(dir string) (*Index, error) {
 	}
 
 	// Phase 3: build Bleve in-memory index with batch operations.
+	// Reduce GC pressure during bulk indexing.
+	oldGC := debug.SetGCPercent(200)
+	defer debug.SetGCPercent(oldGC)
+
 	bslMapping := buildBSLMapping()
-	blevIdx, err := bleve.NewMemOnly(bslMapping)
+	blevIdx, err := bleve.NewUsing("", bslMapping, "scorch", "scorch", nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating bleve index: %w", err)
 	}
 	idx.index = blevIdx
 
 	total := len(idx.names)
-	const batchSize = 1000
+	const batchSize = 5000
 
 	// Adaptive progress step: ~5% increments, minimum 100.
 	step := total / 20
