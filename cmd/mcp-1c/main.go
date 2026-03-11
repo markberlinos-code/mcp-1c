@@ -24,6 +24,7 @@ func main() {
 	password := flag.String("password", "", "1C HTTP service password")
 	dumpDir := flag.String("dump", "", "Path to DumpConfigToFiles output (enables search_code tool)")
 	installDB := flag.String("install", "", "Install extension into 1C database at given path")
+	serverMode := flag.Bool("server", false, `Treat --install value as server connection string (server\database)`)
 	platformPath := flag.String("platform", "", "Path to 1C platform executable (auto-detected if omitted)")
 	dbUser := flag.String("db-user", "", "1C database user for DESIGNER (install mode)")
 	dbPassword := flag.String("db-password", "", "1C database password for DESIGNER (install mode)")
@@ -32,7 +33,7 @@ func main() {
 	// Install mode.
 	if *installDB != "" {
 		fmt.Println("Installing MCP extension into 1C database...")
-		if err := installer.Install(extension.Source, *installDB, *platformPath, *dbUser, *dbPassword); err != nil {
+		if err := installer.Install(extension.Source, *installDB, *serverMode, *platformPath, *dbUser, *dbPassword); err != nil {
 			fmt.Fprintf(os.Stderr, "Installation error: %v\n", err)
 			os.Exit(1)
 		}

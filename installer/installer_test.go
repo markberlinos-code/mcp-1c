@@ -4,9 +4,82 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 )
+
+func TestBuildDesignerArgs(t *testing.T) {
+	tests := []struct {
+		name       string
+		dbPath     string
+		serverMode bool
+		dbUser     string
+		dbPassword string
+		logPath    string
+		extraArgs  []string
+		want       []string
+	}{
+		{
+			name:   "file mode without credentials",
+			dbPath: `C:\MyBase`, logPath: "log.txt",
+			extraArgs: []string{"/LoadConfigFromFiles", "/tmp/ext"},
+			want: []string{
+				"DESIGNER", "/F", `C:\MyBase`,
+				"/LoadConfigFromFiles", "/tmp/ext",
+				"/Out", "log.txt", "/DisableStartupDialogs", "/DisableStartupMessages",
+			},
+		},
+		{
+			name:       "file mode with credentials",
+			dbPath:     `C:\MyBase`,
+			dbUser:     "Admin",
+			dbPassword: "pass",
+			logPath:    "log.txt",
+			extraArgs:  []string{"/LoadConfigFromFiles", "/tmp/ext"},
+			want: []string{
+				"DESIGNER", "/F", `C:\MyBase`,
+				"/N", "Admin", "/P", "pass",
+				"/LoadConfigFromFiles", "/tmp/ext",
+				"/Out", "log.txt", "/DisableStartupDialogs", "/DisableStartupMessages",
+			},
+		},
+		{
+			name:       "server mode without credentials",
+			dbPath:     `server01\accounting`,
+			serverMode: true,
+			logPath:    "log.txt",
+			extraArgs:  []string{"/UpdateDBCfg"},
+			want: []string{
+				"DESIGNER", "/S", `server01\accounting`,
+				"/UpdateDBCfg",
+				"/Out", "log.txt", "/DisableStartupDialogs", "/DisableStartupMessages",
+			},
+		},
+		{
+			name:       "server mode with credentials",
+			dbPath:     `server01\accounting`,
+			serverMode: true,
+			dbUser:     "Admin",
+			dbPassword: "secret",
+			logPath:    "log.txt",
+			want: []string{
+				"DESIGNER", "/S", `server01\accounting`,
+				"/N", "Admin", "/P", "secret",
+				"/Out", "log.txt", "/DisableStartupDialogs", "/DisableStartupMessages",
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := buildDesignerArgs(tc.dbPath, tc.serverMode, tc.dbUser, tc.dbPassword, tc.logPath, tc.extraArgs...)
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("mismatch\ngot:  %v\nwant: %v", got, tc.want)
+			}
+		})
+	}
+}
 
 func TestPlatformPatterns(t *testing.T) {
 	patterns := platformPatterns()

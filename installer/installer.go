@@ -54,7 +54,9 @@ var platformFormatVersions = []struct {
 // Install extracts embedded XML sources to a temp dir, patches the XML format
 // version for compatibility with the detected platform, and loads it into 1C.
 // If platformExe is empty, the platform is auto-detected.
-func Install(srcFS embed.FS, dbPath, platformExe, dbUser, dbPassword string) error {
+// When serverMode is true, the database is treated as a client-server infobase
+// (MS SQL, PostgreSQL) and DESIGNER is invoked with /S instead of /F.
+func Install(srcFS embed.FS, dbPath string, serverMode bool, platformExe, dbUser, dbPassword string) error {
 	if platformExe == "" {
 		var err error
 		platformExe, err = FindPlatform()
@@ -83,7 +85,7 @@ func Install(srcFS embed.FS, dbPath, platformExe, dbUser, dbPassword string) err
 
 	// Load extension XML into extension configuration.
 	fmt.Println("Loading extension into database...")
-	if err := runDesigner(platformExe, dbPath, dbUser, dbPassword,
+	if err := runDesigner(platformExe, dbPath, serverMode, dbUser, dbPassword,
 		"/LoadConfigFromFiles", extDir,
 		"-Extension", extensionName,
 	); err != nil {
@@ -92,14 +94,15 @@ func Install(srcFS embed.FS, dbPath, platformExe, dbUser, dbPassword string) err
 
 	// Apply extension to the database (separate call required).
 	fmt.Println("Updating database...")
-	return runDesigner(platformExe, dbPath, dbUser, dbPassword,
+	return runDesigner(platformExe, dbPath, serverMode, dbUser, dbPassword,
 		"/UpdateDBCfg",
 		"-Extension", extensionName,
 	)
 }
 
 // runDesigner executes 1C DESIGNER with given arguments, capturing output via /Out.
-func runDesigner(platformExe, dbPath, dbUser, dbPassword string, extraArgs ...string) error {
+// When serverMode is true, uses /S (server connection string) instead of /F (file database).
+func runDesigner(platformExe, dbPath string, serverMode bool, dbUser, dbPassword string, extraArgs ...string) error {
 	logFile, err := os.CreateTemp("", "mcp-1c-log-*.txt")
 	if err != nil {
 		return fmt.Errorf("creating log file: %w", err)
@@ -107,15 +110,7 @@ func runDesigner(platformExe, dbPath, dbUser, dbPassword string, extraArgs ...st
 	logFile.Close()
 	defer os.Remove(logFile.Name())
 
-	args := []string{"DESIGNER", "/F", dbPath}
-	if dbUser != "" {
-		args = append(args, "/N", dbUser)
-	}
-	if dbPassword != "" {
-		args = append(args, "/P", dbPassword)
-	}
-	args = append(args, extraArgs...)
-	args = append(args, "/Out", logFile.Name(), "/DisableStartupDialogs", "/DisableStartupMessages")
+	args := buildDesignerArgs(dbPath, serverMode, dbUser, dbPassword, logFile.Name(), extraArgs...)
 
 	cmd := exec.Command(platformExe, args...)
 	cmd.CombinedOutput() //nolint:errcheck // exit code checked via log
@@ -135,6 +130,25 @@ func runDesigner(platformExe, dbPath, dbUser, dbPassword string, extraArgs ...st
 		fmt.Println(logStr)
 	}
 	return nil
+}
+
+// buildDesignerArgs constructs the argument list for 1C DESIGNER.
+// When serverMode is true, uses /S (server connection) instead of /F (file database).
+func buildDesignerArgs(dbPath string, serverMode bool, dbUser, dbPassword, logPath string, extraArgs ...string) []string {
+	connFlag := "/F"
+	if serverMode {
+		connFlag = "/S"
+	}
+	args := []string{"DESIGNER", connFlag, dbPath}
+	if dbUser != "" {
+		args = append(args, "/N", dbUser)
+	}
+	if dbPassword != "" {
+		args = append(args, "/P", dbPassword)
+	}
+	args = append(args, extraArgs...)
+	args = append(args, "/Out", logPath, "/DisableStartupDialogs", "/DisableStartupMessages")
+	return args
 }
 
 // extractXMLTag extracts the text content of a simple XML tag like <TagName>value</TagName>.

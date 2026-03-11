@@ -29,6 +29,9 @@ mcp-1c --install "C:\путь\к\базе"
 
 # macOS / Linux
 mcp-1c --install ~/Documents/InfoBase
+
+# Клиент-серверная база (MS SQL, PostgreSQL)
+mcp-1c --install "srv-1c\buh_prod" --server --db-user Admin --db-password pass
 ```
 
 > Если платформа установлена в нестандартную папку: `mcp-1c --install "путь" --platform "/custom/path/to/1cv8"`
@@ -85,6 +88,7 @@ mcp-1c --install ~/Documents/InfoBase
 | `--password` | `MCP_1C_PASSWORD` | — | Пароль HTTP-сервиса |
 | `--dump` | — | — | Путь к выгрузке конфигурации (DumpConfigToFiles), включает инструмент search_code |
 | `--install` | — | — | Установить расширение в базу 1С по указанному пути |
+| `--server` | — | — | Режим клиент-серверной базы: `--install` принимает строку подключения `сервер\база` (например `srv-1c\buh_prod`) |
 | `--platform` | — | — | Путь к бинарнику 1С (автоопределение, если не указан) |
 | `--db-user` | — | — | Пользователь базы 1С для DESIGNER (режим --install) |
 | `--db-password` | — | — | Пароль базы 1С для DESIGNER (режим --install) |
