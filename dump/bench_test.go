@@ -92,6 +92,8 @@ func BenchmarkBuildIndex_Sharded(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 
+	bslMapping := buildBSLMapping()
+
 	for b.Loop() {
 		dir := b.TempDir()
 		groups := splitByHash(names, n)
@@ -105,7 +107,7 @@ func BenchmarkBuildIndex_Sharded(b *testing.B) {
 		for i := range n {
 			go func(shardID int) {
 				path := dir + fmt.Sprintf("/shard_%d", shardID)
-				idx, err := buildShard(path, groups[shardID], contentByName, shardID, n)
+				idx, err := buildShard(path, groups[shardID], contentByName, shardID, n, bslMapping)
 				results <- result{idx: idx, err: err}
 			}(i)
 		}
@@ -164,27 +166,6 @@ func BenchmarkSearch_Smart(b *testing.B) {
 		})
 		if err != nil {
 			b.Fatalf("Search smart: %v", err)
-		}
-	}
-}
-
-// BenchmarkSearch_Smart_Sharded measures search through IndexAlias with multiple shards.
-func BenchmarkSearch_Smart_Sharded(b *testing.B) {
-	idx := openRealIndex(b)
-	defer idx.Close()
-	b.Logf("Shards: %d, modules: %d", len(idx.shards), idx.ModuleCount())
-
-	b.ResetTimer()
-	b.ReportAllocs()
-
-	for b.Loop() {
-		_, _, err := idx.Search(SearchParams{
-			Query: "Процедура ПередЗаписью",
-			Mode:  SearchModeSmart,
-			Limit: 50,
-		})
-		if err != nil {
-			b.Fatalf("Search: %v", err)
 		}
 	}
 }

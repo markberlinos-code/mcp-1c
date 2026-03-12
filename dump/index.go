@@ -257,6 +257,9 @@ func (idx *Index) buildShards(cpath string, useCache bool) {
 	// returns — restoring it would race with those reads.
 	scorchIndex.DefaultPersisterNapTimeMSec = 500
 
+	// Build the BSL mapping once and share across all shards.
+	bslMapping := buildBSLMapping()
+
 	// Disable GC for entire parallel build.
 	oldGC := debug.SetGCPercent(-1)
 	defer debug.SetGCPercent(oldGC)
@@ -282,7 +285,7 @@ func (idx *Index) buildShards(cpath string, useCache bool) {
 				shardPath = filepath.Join(basePath, fmt.Sprintf("shard_%d", shardID))
 			}
 
-			shard, err := buildShard(shardPath, groups[shardID], idx.contentByName, shardID, n)
+			shard, err := buildShard(shardPath, groups[shardID], idx.contentByName, shardID, n, bslMapping)
 			results <- shardResult{index: shard, id: shardID, err: err}
 		}(i)
 	}
@@ -541,6 +544,9 @@ func (idx *Index) IndexDoc(id string, content string) error {
 	if !idx.ready.Load() {
 		return fmt.Errorf("index not ready: cannot IndexDoc while building")
 	}
+	if len(idx.shards) == 0 {
+		return fmt.Errorf("index has no shards")
+	}
 
 	parts := parseModuleName(id)
 	doc := bslDocument{
@@ -569,6 +575,9 @@ func (idx *Index) IndexDoc(id string, content string) error {
 func (idx *Index) DeleteDoc(id string) error {
 	if !idx.ready.Load() {
 		return fmt.Errorf("index not ready: cannot DeleteDoc while building")
+	}
+	if len(idx.shards) == 0 {
+		return fmt.Errorf("index has no shards")
 	}
 
 	si := shardForID(id, len(idx.shards))
@@ -656,6 +665,9 @@ func (idx *Index) searchSmart(params SearchParams) ([]Match, int, error) {
 	idx.mu.RLock()
 	defer idx.mu.RUnlock()
 
+	lower := strings.ToLower(params.Query)
+	tokens := strings.Fields(lower)
+
 	var matches []Match
 	for _, hit := range result.Hits {
 		content, ok := idx.contentByName[hit.ID]
@@ -664,8 +676,6 @@ func (idx *Index) searchSmart(params SearchParams) ([]Match, int, error) {
 		}
 		// Find the first line containing any query term for context.
 		lines := strings.Split(content, "\n")
-		lower := strings.ToLower(params.Query)
-		tokens := strings.Fields(lower)
 
 		lineNum := 0
 		for i, line := range lines {
@@ -699,13 +709,13 @@ func (idx *Index) searchSmart(params SearchParams) ([]Match, int, error) {
 // searchLineByLine performs line-by-line search using a matcher function.
 // Used for regex and exact modes. Optionally pre-filters modules via Bleve.
 func (idx *Index) searchLineByLine(params SearchParams, match func(line, q string) bool, q string) ([]Match, int, error) {
+	idx.mu.RLock()
+	defer idx.mu.RUnlock()
+
 	candidates, err := idx.filterModules(params.Category, params.Module)
 	if err != nil {
 		return nil, 0, err
 	}
-
-	idx.mu.RLock()
-	defer idx.mu.RUnlock()
 
 	var matches []Match
 	total := 0

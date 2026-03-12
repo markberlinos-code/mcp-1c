@@ -7,6 +7,7 @@ import (
 	"runtime"
 
 	"github.com/blevesearch/bleve/v2"
+	"github.com/blevesearch/bleve/v2/mapping"
 )
 
 // shardCount returns the optimal number of index shards for the given file count.
@@ -44,9 +45,8 @@ func splitByHash(items []string, n int) [][]string {
 // buildShard creates a single Bleve shard index at the given path.
 // It indexes the provided names using content from contentByName.
 // shardID and totalShards are used for progress reporting.
-func buildShard(path string, names []string, contentByName map[string]string, shardID, totalShards int) (bleve.Index, error) {
-	bslMapping := buildBSLMapping()
-
+// The caller must supply a pre-built bslMapping to avoid rebuilding it per shard.
+func buildShard(path string, names []string, contentByName map[string]string, shardID, totalShards int, bslMapping *mapping.IndexMappingImpl) (bleve.Index, error) {
 	blevIdx, err := bleve.NewUsing(path, bslMapping, "scorch", "scorch", map[string]any{
 		"unsafe_batch": true,
 	})
