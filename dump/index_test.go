@@ -2,10 +2,12 @@ package dump
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/blevesearch/bleve/v2"
 )
@@ -24,6 +26,20 @@ func mkBSLFile(t *testing.T, base, relPath, content string) {
 	}
 }
 
+// waitReady blocks until idx.Ready() returns true or timeout expires.
+func waitReady(t *testing.T, idx *Index, timeout time.Duration) {
+	t.Helper()
+	deadline := time.After(timeout)
+	for !idx.Ready() {
+		select {
+		case <-deadline:
+			t.Fatal("timed out waiting for index to become ready")
+		default:
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+}
+
 func TestNewIndex(t *testing.T) {
 	dir := t.TempDir()
 	mkBSLFile(t, dir, "Catalogs/Номенклатура/Ext/ObjectModule.bsl",
@@ -36,6 +52,7 @@ func TestNewIndex(t *testing.T) {
 		t.Fatalf("NewIndex: %v", err)
 	}
 	defer idx.Close()
+	waitReady(t, idx, 30*time.Second)
 
 	if idx.ModuleCount() != 2 {
 		t.Errorf("expected 2 modules, got %d", idx.ModuleCount())
@@ -55,6 +72,7 @@ func TestIndex_SearchSmart(t *testing.T) {
 		t.Fatalf("NewIndex: %v", err)
 	}
 	defer idx.Close()
+	waitReady(t, idx, 30*time.Second)
 
 	matches, total, err := idx.Search(SearchParams{
 		Query: "ОбновитьЦены",
@@ -90,6 +108,7 @@ func TestIndex_SearchSmartSynonym(t *testing.T) {
 		t.Fatalf("NewIndex: %v", err)
 	}
 	defer idx.Close()
+	waitReady(t, idx, 30*time.Second)
 
 	// Search using English function name — should find via synonym.
 	matches, total, err := idx.Search(SearchParams{
@@ -119,6 +138,7 @@ func TestIndex_SearchRegex(t *testing.T) {
 		t.Fatalf("NewIndex: %v", err)
 	}
 	defer idx.Close()
+	waitReady(t, idx, 30*time.Second)
 
 	matches, total, err := idx.Search(SearchParams{
 		Query: `Обработка\d+`,
@@ -147,6 +167,7 @@ func TestIndex_SearchRegexInvalid(t *testing.T) {
 		t.Fatalf("NewIndex: %v", err)
 	}
 	defer idx.Close()
+	waitReady(t, idx, 30*time.Second)
 
 	_, _, err = idx.Search(SearchParams{
 		Query: "[invalid",
@@ -168,6 +189,7 @@ func TestIndex_SearchExact(t *testing.T) {
 		t.Fatalf("NewIndex: %v", err)
 	}
 	defer idx.Close()
+	waitReady(t, idx, 30*time.Second)
 
 	matches, total, err := idx.Search(SearchParams{
 		Query: "ОбновитьЦены",
@@ -202,6 +224,7 @@ func TestIndex_SearchCaseInsensitive(t *testing.T) {
 		t.Fatalf("NewIndex: %v", err)
 	}
 	defer idx.Close()
+	waitReady(t, idx, 30*time.Second)
 
 	// Exact mode: case-insensitive by design.
 	matches, total, err := idx.Search(SearchParams{
@@ -230,6 +253,7 @@ func TestIndex_SearchLimit(t *testing.T) {
 		t.Fatalf("NewIndex: %v", err)
 	}
 	defer idx.Close()
+	waitReady(t, idx, 30*time.Second)
 
 	matches, total, err := idx.Search(SearchParams{
 		Query: "Строка",
@@ -259,6 +283,7 @@ func TestIndex_SearchCategoryFilter(t *testing.T) {
 		t.Fatalf("NewIndex: %v", err)
 	}
 	defer idx.Close()
+	waitReady(t, idx, 30*time.Second)
 
 	matches, total, err := idx.Search(SearchParams{
 		Query:    "ОбщаяЛогика",
@@ -292,6 +317,7 @@ func TestIndex_SearchModuleFilter(t *testing.T) {
 		t.Fatalf("NewIndex: %v", err)
 	}
 	defer idx.Close()
+	waitReady(t, idx, 30*time.Second)
 
 	matches, _, err := idx.Search(SearchParams{
 		Query:  "Общая",
@@ -341,6 +367,7 @@ func TestIndex_Close(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewIndex: %v", err)
 	}
+	waitReady(t, idx, 30*time.Second)
 
 	if err := idx.Close(); err != nil {
 		t.Errorf("Close: %v", err)
@@ -356,6 +383,7 @@ func TestIndex_Reindex(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewIndex (first build): %v", err)
 	}
+	waitReady(t, idx1, 30*time.Second)
 	if idx1.ModuleCount() != 1 {
 		t.Errorf("expected 1 module, got %d", idx1.ModuleCount())
 	}
@@ -366,6 +394,7 @@ func TestIndex_Reindex(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewIndex (cached): %v", err)
 	}
+	waitReady(t, idx2, 30*time.Second)
 	if idx2.ModuleCount() != 1 {
 		t.Errorf("expected 1 module from cache, got %d", idx2.ModuleCount())
 	}
@@ -376,6 +405,7 @@ func TestIndex_Reindex(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewIndex (reindex): %v", err)
 	}
+	waitReady(t, idx3, 30*time.Second)
 	if idx3.ModuleCount() != 1 {
 		t.Errorf("expected 1 module after reindex, got %d", idx3.ModuleCount())
 	}
@@ -392,6 +422,7 @@ func TestIndex_SearchDefaultMode(t *testing.T) {
 		t.Fatalf("NewIndex: %v", err)
 	}
 	defer idx.Close()
+	waitReady(t, idx, 30*time.Second)
 
 	// Empty mode should default to smart.
 	matches, _, err := idx.Search(SearchParams{
@@ -414,8 +445,9 @@ func TestIndex_Ready(t *testing.T) {
 		t.Fatalf("NewIndex: %v", err)
 	}
 	defer idx.Close()
+	waitReady(t, idx, 30*time.Second)
 	if !idx.Ready() {
-		t.Error("expected Ready() == true after blocking NewIndex")
+		t.Error("expected Ready() == true after build completes")
 	}
 }
 
@@ -437,5 +469,64 @@ func TestIndex_SearchWhileBuilding(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "building") {
 		t.Errorf("expected 'building' in error message, got: %v", err)
+	}
+}
+
+func TestIndex_NonBlockingBuild(t *testing.T) {
+	dir := t.TempDir()
+	mkBSLFile(t, dir, "Catalogs/Тест/Ext/ObjectModule.bsl", "Процедура Тест()\nКонецПроцедуры\n")
+
+	idx, err := NewIndex(dir, false)
+	if err != nil {
+		t.Fatalf("NewIndex: %v", err)
+	}
+	defer idx.Close()
+
+	waitReady(t, idx, 30*time.Second)
+
+	if idx.ModuleCount() != 1 {
+		t.Errorf("expected 1 module, got %d", idx.ModuleCount())
+	}
+
+	matches, total, err := idx.Search(SearchParams{Query: "Тест", Mode: SearchModeSmart, Limit: 50})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	if total == 0 || len(matches) == 0 {
+		t.Error("expected at least 1 match")
+	}
+}
+
+func TestIndex_EmptyDir(t *testing.T) {
+	dir := t.TempDir()
+	idx, err := NewIndex(dir, false)
+	if err != nil {
+		t.Fatalf("NewIndex: %v", err)
+	}
+	defer idx.Close()
+	waitReady(t, idx, 30*time.Second)
+	if idx.ModuleCount() != 0 {
+		t.Errorf("expected 0 modules, got %d", idx.ModuleCount())
+	}
+}
+
+func TestIndex_CloseWhileBuilding(t *testing.T) {
+	dir := t.TempDir()
+	for i := range 50 {
+		mkBSLFile(t, dir, fmt.Sprintf("Catalogs/Test%d/Ext/ObjectModule.bsl", i),
+			fmt.Sprintf("Процедура Тест%d()\nКонецПроцедуры\n", i))
+	}
+	idx, err := NewIndex(dir, false)
+	if err != nil {
+		t.Fatalf("NewIndex: %v", err)
+	}
+	err = idx.Close()
+	if err != nil {
+		t.Logf("Close returned error (acceptable): %v", err)
+	}
+	select {
+	case <-idx.done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("build goroutine did not exit after Close()")
 	}
 }

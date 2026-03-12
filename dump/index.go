@@ -166,10 +166,9 @@ type loadedModule struct {
 	content string
 }
 
-// NewIndex walks the dump directory, loads all .bsl files in parallel and builds
-// a Bleve index. The index is cached on disk for fast subsequent opens.
-// If reindex is true, any existing cache is discarded and rebuilt from scratch.
-// Progress is printed to stderr.
+// NewIndex creates a new Index for the given dump directory. The index is built
+// asynchronously in a background goroutine and becomes available when Ready()
+// returns true. If reindex is true, any existing cache is discarded and rebuilt.
 func NewIndex(dir string, reindex bool) (*Index, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	idx := &Index{
@@ -180,64 +179,161 @@ func NewIndex(dir string, reindex bool) (*Index, error) {
 		cancel:        cancel,
 		done:          make(chan struct{}),
 	}
-	defer close(idx.done)
 
-	// Determine cache path; fall back to in-memory if it fails.
 	cpath, cacheErr := cachePath(dir)
 	useCache := cacheErr == nil
 
-	// Try to open existing cache.
-	if useCache && !reindex {
-		if blevIdx, err := bleve.Open(cpath); err == nil {
-			idx.shards = []bleve.Index{blevIdx}
-			idx.alias.Add(blevIdx)
-
-			// Load contentByName from .bsl files (needed for regex/exact mode).
-			if err := idx.loadBSLFiles(dir); err != nil {
-				blevIdx.Close()
-				cancel()
-				return nil, err
-			}
-			idx.ready.Store(true)
-			fmt.Fprintf(os.Stderr, "Opened cached index for %d BSL modules\n", len(idx.names))
-			return idx, nil
-		}
-	}
-
-	// No usable cache — full build required.
-
-	// Load all .bsl file contents.
-	if err := idx.loadBSLFiles(dir); err != nil {
-		cancel()
-		return nil, err
-	}
-
-	// Prepare on-disk or in-memory Bleve index path.
-	indexPath := "" // in-memory fallback
-	if useCache {
-		// Remove stale cache if it exists.
+	if useCache && reindex {
 		os.RemoveAll(cpath)
-		if err := os.MkdirAll(filepath.Dir(cpath), 0o755); err == nil {
-			indexPath = cpath
+	}
+
+	// Try to open existing sharded cache.
+	if useCache && !reindex {
+		if shardDirs := cacheShardDirs(cpath); len(shardDirs) > 0 {
+			shards, err := openCachedShards(shardDirs)
+			if err == nil {
+				idx.shards = shards
+				idx.alias.Add(shards...)
+
+				// Load contentByName in background (needed for regex/exact mode).
+				go func() {
+					defer close(idx.done)
+					if err := idx.loadBSLFiles(dir); err != nil {
+						idx.setBuildErr(err)
+						return
+					}
+					idx.ready.Store(true)
+					fmt.Fprintf(os.Stderr, "Opened cached index (%d shards) for %d BSL modules\n",
+						len(shards), len(idx.names))
+				}()
+				return idx, nil
+			}
+			// Cache corrupt — remove and rebuild.
+			os.RemoveAll(cpath)
 		}
 	}
 
-	// Disable GC entirely during bulk indexing; restore after.
+	// No usable cache — full sharded build in background.
+	go func() {
+		defer close(idx.done)
+		idx.buildShards(cpath, useCache)
+	}()
+
+	return idx, nil
+}
+
+// setBuildErr stores a build error atomically.
+func (idx *Index) setBuildErr(err error) {
+	idx.buildErr.Store(&err)
+}
+
+// buildShards loads BSL files and builds N shards in parallel.
+func (idx *Index) buildShards(cpath string, useCache bool) {
+	if err := idx.loadBSLFiles(idx.dir); err != nil {
+		idx.setBuildErr(fmt.Errorf("loading BSL files: %w", err))
+		return
+	}
+
+	total := len(idx.names)
+	if total == 0 {
+		idx.ready.Store(true)
+		fmt.Fprintln(os.Stderr, "No BSL modules found, index is empty")
+		return
+	}
+
+	n := shardCount(total)
+	groups := splitByHash(idx.names, n)
+	fmt.Fprintf(os.Stderr, "Building index: %d modules, %d shards\n", total, n)
+
+	var basePath string
+	if cpath != "" && useCache {
+		os.MkdirAll(cpath, 0o755)
+		basePath = cpath
+	}
+
+	// Increase persister nap time to favour in-memory segment merging.
+	// Set once before shard goroutines start. Not restored because the persister
+	// goroutines inside each shard continue reading this global after buildShards
+	// returns — restoring it would race with those reads.
+	scorchIndex.DefaultPersisterNapTimeMSec = 500
+
+	// Disable GC for entire parallel build.
 	oldGC := debug.SetGCPercent(-1)
 	defer debug.SetGCPercent(oldGC)
 
-	// Use NewUsing+batch approach (benchmarked faster than NewBuilder for our workload).
-	// NewBuilder is available via buildIndexBuilder() for experimentation.
-	blevIdx, err := buildIndexBatch(indexPath, idx.names, idx.contentByName)
-	if err != nil {
-		cancel()
-		return nil, err
+	type shardResult struct {
+		index bleve.Index
+		id    int
+		err   error
 	}
-	idx.shards = []bleve.Index{blevIdx}
-	idx.alias.Add(blevIdx)
-	idx.ready.Store(true)
+	results := make(chan shardResult, n)
 
-	return idx, nil
+	for i := range n {
+		go func(shardID int) {
+			select {
+			case <-idx.ctx.Done():
+				results <- shardResult{id: shardID, err: idx.ctx.Err()}
+				return
+			default:
+			}
+
+			var shardPath string
+			if basePath != "" {
+				shardPath = filepath.Join(basePath, fmt.Sprintf("shard_%d", shardID))
+			}
+
+			shard, err := buildShard(shardPath, groups[shardID], idx.contentByName, shardID, n)
+			results <- shardResult{index: shard, id: shardID, err: err}
+		}(i)
+	}
+
+	// Collect. Always receive all n to avoid goroutine leak.
+	shards := make([]bleve.Index, n)
+	var firstErr error
+	for range n {
+		res := <-results
+		if res.err != nil && firstErr == nil {
+			firstErr = res.err
+			idx.cancel()
+		}
+		if res.index != nil {
+			shards[res.id] = res.index
+		}
+	}
+	if firstErr != nil {
+		for _, s := range shards {
+			if s != nil {
+				s.Close()
+			}
+		}
+		if cpath != "" {
+			os.RemoveAll(cpath)
+		}
+		idx.setBuildErr(firstErr)
+		return
+	}
+
+	idx.shards = shards
+	idx.alias.Add(shards...)
+	idx.ready.Store(true)
+	fmt.Fprintf(os.Stderr, "Index ready: %d modules in %d shards\n", total, n)
+}
+
+// openCachedShards opens pre-built Bleve shard indexes from disk.
+// On any error, all previously opened shards are closed.
+func openCachedShards(dirs []string) ([]bleve.Index, error) {
+	shards := make([]bleve.Index, len(dirs))
+	for i, dir := range dirs {
+		blevIdx, err := bleve.Open(dir)
+		if err != nil {
+			for j := range i {
+				shards[j].Close()
+			}
+			return nil, fmt.Errorf("opening shard %d: %w", i, err)
+		}
+		shards[i] = blevIdx
+	}
+	return shards, nil
 }
 
 // buildIndexBuilder creates a Bleve index using the offline builder (bleve.NewBuilder).

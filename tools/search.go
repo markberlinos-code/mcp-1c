@@ -70,7 +70,7 @@ func NewSearchCodeHandler(index *dump.Index) mcp.ToolHandler {
 		}
 
 		limit := clampLimit(input.Limit, defaultSearchLimit, maxSearchLimit)
-		mode := dump.SearchModeSmart
+		var mode dump.SearchMode
 		switch input.Mode {
 		case "regex":
 			mode = dump.SearchModeRegex

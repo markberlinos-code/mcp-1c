@@ -7,7 +7,6 @@ import (
 	"runtime"
 
 	"github.com/blevesearch/bleve/v2"
-	scorchIndex "github.com/blevesearch/bleve/v2/index/scorch"
 )
 
 // shardCount returns the optimal number of index shards for the given file count.
@@ -46,10 +45,6 @@ func splitByHash(items []string, n int) [][]string {
 // It indexes the provided names using content from contentByName.
 // shardID and totalShards are used for progress reporting.
 func buildShard(path string, names []string, contentByName map[string]string, shardID, totalShards int) (bleve.Index, error) {
-	oldNap := scorchIndex.DefaultPersisterNapTimeMSec
-	scorchIndex.DefaultPersisterNapTimeMSec = 500
-	defer func() { scorchIndex.DefaultPersisterNapTimeMSec = oldNap }()
-
 	bslMapping := buildBSLMapping()
 
 	blevIdx, err := bleve.NewUsing(path, bslMapping, "scorch", "scorch", map[string]any{

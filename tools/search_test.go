@@ -7,10 +7,25 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/feenlace/mcp-1c/dump"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
+
+// waitReady blocks until idx.Ready() returns true or timeout expires.
+func waitReady(t *testing.T, idx *dump.Index, timeout time.Duration) {
+	t.Helper()
+	deadline := time.After(timeout)
+	for !idx.Ready() {
+		select {
+		case <-deadline:
+			t.Fatal("timed out waiting for index to become ready")
+		default:
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+}
 
 func TestSearchCodeTool(t *testing.T) {
 	tool := SearchCodeTool()
@@ -29,11 +44,11 @@ func TestSearchCodeTool(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshaling input schema: %v", err)
 	}
-	var schema map[string]interface{}
+	var schema map[string]any
 	if err := json.Unmarshal(schemaBytes, &schema); err != nil {
 		t.Fatalf("parsing input schema: %v", err)
 	}
-	props, ok := schema["properties"].(map[string]interface{})
+	props, ok := schema["properties"].(map[string]any)
 	if !ok {
 		t.Fatal("expected properties in schema")
 	}
@@ -139,6 +154,7 @@ func TestNewSearchCodeHandler(t *testing.T) {
 		t.Fatalf("NewIndex: %v", err)
 	}
 	defer index.Close()
+	waitReady(t, index, 30*time.Second)
 
 	handler := NewSearchCodeHandler(index)
 
@@ -193,6 +209,7 @@ func TestNewSearchCodeHandler_WithFilters(t *testing.T) {
 		t.Fatalf("NewIndex: %v", err)
 	}
 	defer index.Close()
+	waitReady(t, index, 30*time.Second)
 
 	handler := NewSearchCodeHandler(index)
 

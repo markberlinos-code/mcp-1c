@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/feenlace/mcp-1c/dump"
 	"github.com/feenlace/mcp-1c/onec"
@@ -200,6 +201,18 @@ func setupIntegration(t *testing.T) (*mcp.ClientSession, func()) {
 	if err != nil {
 		mock.Close()
 		t.Fatalf("NewIndex: %v", err)
+	}
+
+	deadline := time.After(30 * time.Second)
+	for !dumpIndex.Ready() {
+		select {
+		case <-deadline:
+			dumpIndex.Close()
+			mock.Close()
+			t.Fatal("timed out waiting for dump index to become ready")
+		default:
+			time.Sleep(10 * time.Millisecond)
+		}
 	}
 
 	srv := New("test", client, dumpIndex)
