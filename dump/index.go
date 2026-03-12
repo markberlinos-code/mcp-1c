@@ -537,8 +537,8 @@ func parseModuleName(fullName string) moduleNameParts {
 
 // IndexDoc adds or replaces a document in the index at runtime.
 // The document is routed to a shard by FNV-1a hash of the id.
-// It updates contentByName but does NOT modify names/ModuleCount (by design:
-// runtime-added docs are transient and not part of the initial file scan).
+// It updates contentByName and names (with dedup), so ModuleCount and all
+// search modes (regex, exact, smart) reflect the new document immediately.
 // Requires Ready() == true.
 func (idx *Index) IndexDoc(id string, content string) error {
 	if !idx.ready.Load() {
@@ -562,6 +562,9 @@ func (idx *Index) IndexDoc(id string, content string) error {
 	}
 
 	idx.mu.Lock()
+	if _, exists := idx.contentByName[id]; !exists {
+		idx.names = append(idx.names, id)
+	}
 	idx.contentByName[id] = content
 	idx.mu.Unlock()
 

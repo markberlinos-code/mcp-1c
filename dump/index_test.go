@@ -562,8 +562,8 @@ func TestIndex_IndexDoc(t *testing.T) {
 		t.Error("expected contentByName to contain the new document")
 	}
 
-	if idx.ModuleCount() != 1 {
-		t.Errorf("expected ModuleCount to remain 1, got %d", idx.ModuleCount())
+	if idx.ModuleCount() != 2 {
+		t.Errorf("expected ModuleCount to be 2, got %d", idx.ModuleCount())
 	}
 }
 
@@ -644,5 +644,104 @@ func TestIndex_DeleteDoc_NotReady(t *testing.T) {
 	err := idx.DeleteDoc("test")
 	if err == nil {
 		t.Fatal("expected error when DeleteDoc on not-ready index")
+	}
+}
+
+func TestIndex_IndexDoc_RegexVisible(t *testing.T) {
+	dir := t.TempDir()
+	mkBSLFile(t, dir, "Catalogs/Тест/Ext/ObjectModule.bsl", "Процедура Тест()\nКонецПроцедуры\n")
+
+	idx, err := NewIndex(dir, false)
+	if err != nil {
+		t.Fatalf("NewIndex: %v", err)
+	}
+	defer idx.Close()
+	waitReady(t, idx, 30*time.Second)
+
+	err = idx.IndexDoc("Документ.Новый.МодульОбъекта", "Функция УникальнаяФункцияRT()\n\tВозврат 42;\nКонецФункции\n")
+	if err != nil {
+		t.Fatalf("IndexDoc: %v", err)
+	}
+
+	matches, total, err := idx.Search(SearchParams{Query: `УникальнаяФункцияRT`, Mode: SearchModeRegex, Limit: 50})
+	if err != nil {
+		t.Fatalf("Search regex: %v", err)
+	}
+	if total == 0 || len(matches) == 0 {
+		t.Error("expected regex search to find runtime-indexed document")
+	}
+
+	matches, total, err = idx.Search(SearchParams{Query: "УникальнаяФункцияRT", Mode: SearchModeExact, Limit: 50})
+	if err != nil {
+		t.Fatalf("Search exact: %v", err)
+	}
+	if total == 0 || len(matches) == 0 {
+		t.Error("expected exact search to find runtime-indexed document")
+	}
+}
+
+func TestIndex_IndexDoc_Dedup(t *testing.T) {
+	dir := t.TempDir()
+	mkBSLFile(t, dir, "Catalogs/Тест/Ext/ObjectModule.bsl", "Процедура Тест() КонецПроцедуры")
+
+	idx, err := NewIndex(dir, false)
+	if err != nil {
+		t.Fatalf("NewIndex: %v", err)
+	}
+	defer idx.Close()
+	waitReady(t, idx, 30*time.Second)
+
+	id := "Справочник.Тест.МодульОбъекта"
+	if err := idx.IndexDoc(id, "Обновлённый код"); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.IndexDoc(id, "Ещё раз обновлённый"); err != nil {
+		t.Fatal(err)
+	}
+
+	if idx.ModuleCount() != 1 {
+		t.Fatalf("expected ModuleCount 1 after duplicate IndexDoc, got %d", idx.ModuleCount())
+	}
+}
+
+func TestIndex_DeleteDoc_RemovesFromNames(t *testing.T) {
+	dir := t.TempDir()
+	mkBSLFile(t, dir, "Catalogs/Тест/Ext/ObjectModule.bsl", "Процедура Удаляемая()\nКонецПроцедуры\n")
+
+	idx, err := NewIndex(dir, false)
+	if err != nil {
+		t.Fatalf("NewIndex: %v", err)
+	}
+	defer idx.Close()
+	waitReady(t, idx, 30*time.Second)
+
+	docID := "Справочник.Тест.МодульОбъекта"
+	if idx.ModuleCount() != 1 {
+		t.Fatalf("expected 1 module before delete, got %d", idx.ModuleCount())
+	}
+
+	err = idx.DeleteDoc(docID)
+	if err != nil {
+		t.Fatalf("DeleteDoc: %v", err)
+	}
+
+	if idx.ModuleCount() != 0 {
+		t.Errorf("expected ModuleCount 0 after delete, got %d", idx.ModuleCount())
+	}
+
+	matches, total, err := idx.Search(SearchParams{Query: "Удаляемая", Mode: SearchModeExact, Limit: 50})
+	if err != nil {
+		t.Fatalf("Search exact after delete: %v", err)
+	}
+	if total != 0 || len(matches) != 0 {
+		t.Errorf("expected 0 matches after delete, got total=%d matches=%d", total, len(matches))
+	}
+
+	matches, total, err = idx.Search(SearchParams{Query: "Удаляемая", Mode: SearchModeRegex, Limit: 50})
+	if err != nil {
+		t.Fatalf("Search regex after delete: %v", err)
+	}
+	if total != 0 || len(matches) != 0 {
+		t.Errorf("expected 0 regex matches after delete, got total=%d matches=%d", total, len(matches))
 	}
 }
