@@ -623,62 +623,52 @@ func (idx *Index) loadBSLPaths(dir string) error {
 // ensureAllContentLoaded bulk-loads all file content that hasn't been lazily loaded yet.
 // Used by searchLineByLine (regex/exact modes) which need to scan all modules.
 // Reads files in parallel using a worker pool for performance.
+//
+// Lock ordering: mu.RLock is acquired and released first (phase 1), then contentMu
+// is used separately (phase 2, 3). This avoids deadlock with GetContent which takes
+// contentMu then mu.
 func (idx *Index) ensureAllContentLoaded() {
-	// Collect paths that need loading under read lock.
+	// Phase 1: collect all name->path mappings (under mu only).
 	idx.mu.RLock()
-	var toLoad []struct {
-		name string
-		path string
-	}
+	allPaths := make(map[string]string, len(idx.pathByName))
 	for name, path := range idx.pathByName {
-		idx.contentMu.RLock()
-		_, loaded := idx.contentByName[name]
-		idx.contentMu.RUnlock()
-		if !loaded {
-			toLoad = append(toLoad, struct {
-				name string
-				path string
-			}{name, path})
-		}
+		allPaths[name] = path
 	}
 	idx.mu.RUnlock()
+
+	// Phase 2: find which ones need loading (under contentMu only).
+	idx.contentMu.RLock()
+	var toLoad []struct{ name, path string }
+	for name, path := range allPaths {
+		if _, ok := idx.contentByName[name]; !ok {
+			toLoad = append(toLoad, struct{ name, path string }{name, path})
+		}
+	}
+	idx.contentMu.RUnlock()
 
 	if len(toLoad) == 0 {
 		return
 	}
 
-	type result struct {
-		name    string
-		content string
-	}
-	results := make(chan result, len(toLoad))
-	var wg sync.WaitGroup
+	// Phase 3: load files in parallel, write to contentByName.
 	sem := make(chan struct{}, runtime.NumCPU())
-
+	var wg sync.WaitGroup
 	for _, item := range toLoad {
 		wg.Add(1)
+		sem <- struct{}{}
 		go func(name, path string) {
 			defer wg.Done()
-			sem <- struct{}{}
 			defer func() { <-sem }()
 			data, err := os.ReadFile(path)
 			if err != nil {
 				return
 			}
-			results <- result{name: name, content: string(data)}
+			idx.contentMu.Lock()
+			idx.contentByName[name] = string(data)
+			idx.contentMu.Unlock()
 		}(item.name, item.path)
 	}
-
-	go func() {
-		wg.Wait()
-		close(results)
-	}()
-
-	idx.contentMu.Lock()
-	for r := range results {
-		idx.contentByName[r.name] = r.content
-	}
-	idx.contentMu.Unlock()
+	wg.Wait()
 }
 
 // moduleNameParts holds the parsed components of a human-readable module name.
@@ -733,8 +723,12 @@ func (idx *Index) IndexDoc(id string, content string) error {
 		return fmt.Errorf("indexing doc %q in shard %d: %w", id, si, err)
 	}
 
-	idx.mu.Lock()
+	// Check existence under both locks to decide whether this is a new doc.
+	idx.contentMu.RLock()
 	_, inContent := idx.contentByName[id]
+	idx.contentMu.RUnlock()
+
+	idx.mu.Lock()
 	_, inPath := idx.pathByName[id]
 	if !inContent && !inPath {
 		idx.names = append(idx.names, id)
@@ -742,8 +736,11 @@ func (idx *Index) IndexDoc(id string, content string) error {
 			idx.pathIndex.AddEntry(id)
 		}
 	}
-	idx.contentByName[id] = content
 	idx.mu.Unlock()
+
+	idx.contentMu.Lock()
+	idx.contentByName[id] = content
+	idx.contentMu.Unlock()
 
 	return nil
 }
@@ -772,8 +769,12 @@ func (idx *Index) IndexDocWithMeta(id, content, category, module string) error {
 		return fmt.Errorf("indexing doc %q in shard %d: %w", id, si, err)
 	}
 
-	idx.mu.Lock()
+	// Check existence under both locks to decide whether this is a new doc.
+	idx.contentMu.RLock()
 	_, inContent := idx.contentByName[id]
+	idx.contentMu.RUnlock()
+
+	idx.mu.Lock()
 	_, inPath := idx.pathByName[id]
 	if !inContent && !inPath {
 		idx.names = append(idx.names, id)
@@ -781,8 +782,11 @@ func (idx *Index) IndexDocWithMeta(id, content, category, module string) error {
 			idx.pathIndex.AddEntryWithMeta(id, category, module)
 		}
 	}
-	idx.contentByName[id] = content
 	idx.mu.Unlock()
+
+	idx.contentMu.Lock()
+	idx.contentByName[id] = content
+	idx.contentMu.Unlock()
 
 	return nil
 }
@@ -805,8 +809,11 @@ func (idx *Index) DeleteDoc(id string) error {
 		return fmt.Errorf("deleting doc %q from shard %d: %w", id, si, err)
 	}
 
-	idx.mu.Lock()
+	idx.contentMu.Lock()
 	delete(idx.contentByName, id)
+	idx.contentMu.Unlock()
+
+	idx.mu.Lock()
 	delete(idx.pathByName, id)
 	if idx.pathIndex != nil {
 		idx.pathIndex.RemoveEntry(id)
@@ -1160,8 +1167,11 @@ func (idx *Index) applyIncrementalUpdate(cacheDir string) error {
 		if err := idx.shards[si].Delete(docID); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to delete %q from shard: %v\n", docID, err)
 		}
-		idx.mu.Lock()
+		idx.contentMu.Lock()
 		delete(idx.contentByName, docID)
+		idx.contentMu.Unlock()
+
+		idx.mu.Lock()
 		delete(idx.pathByName, docID)
 		delete(idx.pathToDocID, relPath)
 		for i, n := range idx.names {
@@ -1198,17 +1208,23 @@ func (idx *Index) applyIncrementalUpdate(cacheDir string) error {
 			continue
 		}
 
-		idx.mu.Lock()
+		idx.contentMu.RLock()
 		_, inContent := idx.contentByName[docID]
+		idx.contentMu.RUnlock()
+
+		idx.mu.Lock()
 		_, inPath := idx.pathByName[docID]
 		if !inContent && !inPath {
 			idx.names = append(idx.names, docID)
 		}
-		// Pre-warm content cache for recently changed files.
-		idx.contentByName[docID] = content
 		idx.pathByName[docID] = absPath
 		idx.pathToDocID[relPath] = docID
 		idx.mu.Unlock()
+
+		// Pre-warm content cache for recently changed files.
+		idx.contentMu.Lock()
+		idx.contentByName[docID] = content
+		idx.contentMu.Unlock()
 	}
 
 	fmt.Fprintf(os.Stderr, "Incremental update: +%d added, ~%d modified, -%d deleted\n",

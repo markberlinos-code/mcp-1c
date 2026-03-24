@@ -79,10 +79,14 @@ func (pi *PathIndex) Filter(category, objectName, moduleType string) []PathEntry
 		return nil
 	}
 
-	// If no filters, return all entries.
+	// If no filters, return all non-deleted entries.
 	if category == "" && objectName == "" && moduleType == "" {
-		result := make([]PathEntry, len(pi.entries))
-		copy(result, pi.entries)
+		result := make([]PathEntry, 0, len(pi.entries))
+		for _, e := range pi.entries {
+			if e.DocID != "" {
+				result = append(result, e)
+			}
+		}
 		return result
 	}
 
@@ -145,9 +149,11 @@ func (pi *PathIndex) FilterDocIDs(category, moduleType string) []string {
 	}
 
 	if category == "" && moduleType == "" {
-		result := make([]string, len(pi.entries))
+		result := make([]string, 0, len(pi.entries))
 		for i := range pi.entries {
-			result[i] = pi.entries[i].DocID
+			if pi.entries[i].DocID != "" {
+				result = append(result, pi.entries[i].DocID)
+			}
 		}
 		return result
 	}
