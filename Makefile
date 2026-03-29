@@ -13,12 +13,12 @@ clean:
 	rm -rf bin/ dist/
 
 release:
-	GOOS=windows GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o dist/mcp-1c-windows-amd64.exe ./cmd/mcp-1c
-	GOOS=windows GOARCH=arm64 go build -ldflags "$(LDFLAGS)" -o dist/mcp-1c-windows-arm64.exe ./cmd/mcp-1c
-	GOOS=linux GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o dist/mcp-1c-linux-amd64 ./cmd/mcp-1c
-	GOOS=linux GOARCH=arm64 go build -ldflags "$(LDFLAGS)" -o dist/mcp-1c-linux-arm64 ./cmd/mcp-1c
-	GOOS=darwin GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o dist/mcp-1c-darwin-amd64 ./cmd/mcp-1c
-	GOOS=darwin GOARCH=arm64 go build -ldflags "$(LDFLAGS)" -o dist/mcp-1c-darwin-arm64 ./cmd/mcp-1c
+	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o dist/mcp-1c-windows-amd64.exe ./cmd/mcp-1c
+	CGO_ENABLED=0 GOOS=windows GOARCH=arm64 go build -ldflags "$(LDFLAGS)" -o dist/mcp-1c-windows-arm64.exe ./cmd/mcp-1c
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o dist/mcp-1c-linux-amd64 ./cmd/mcp-1c
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags "$(LDFLAGS)" -o dist/mcp-1c-linux-arm64 ./cmd/mcp-1c
+	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o dist/mcp-1c-darwin-amd64 ./cmd/mcp-1c
+	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags "$(LDFLAGS)" -o dist/mcp-1c-darwin-arm64 ./cmd/mcp-1c
 
 mock:
 	go run ./cmd/mock-1c
