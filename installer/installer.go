@@ -17,7 +17,7 @@ import (
 const extensionName = "MCP_HTTPService"
 
 // defaultFormatVersion is the fallback XML dump format version used when the
-// platform version cannot be detected. 2.8 is the format for 1C 8.3.14 —
+// platform version cannot be detected. 2.8 is the format for 1C 8.3.10 —
 // the minimum platform version we support.
 const defaultFormatVersion = "2.8"
 
@@ -108,13 +108,29 @@ func Install(srcFS embed.FS, dbPath string, serverMode bool, platformExe, dbUser
 			if writeErr := os.WriteFile(cfgPath, cfgData, 0o644); writeErr != nil {
 				return fmt.Errorf("loading extension config: %w", err)
 			}
-			if retryErr := runDesigner(platformExe, dbPath, serverMode, dbUser, dbPassword,
+			err = runDesigner(platformExe, dbPath, serverMode, dbUser, dbPassword,
 				"/LoadConfigFromFiles", extDir,
 				"-Extension", extensionName,
-			); retryErr != nil {
-				return fmt.Errorf("loading extension config (retry without DefaultRunMode): %w", retryErr)
+			)
+		}
+
+		// When the extension's compatibility mode is higher than the base
+		// configuration's, DESIGNER rejects it with an error mentioning
+		// "режим совместимости". Remove the tag and let 1C inherit from the
+		// base configuration, then retry.
+		if err != nil && strings.Contains(strings.ToLower(err.Error()), "режим совместимости") {
+			fmt.Println("Retrying without extension compatibility mode (mode mismatch)...")
+			cfgPath := filepath.Join(extDir, "Configuration.xml")
+			if patchErr := patchExtensionXML(cfgPath, "DontUse", ""); patchErr != nil {
+				return fmt.Errorf("loading extension config: patch compat mode: %w", patchErr)
 			}
-		} else {
+			err = runDesigner(platformExe, dbPath, serverMode, dbUser, dbPassword,
+				"/LoadConfigFromFiles", extDir,
+				"-Extension", extensionName,
+			)
+		}
+
+		if err != nil {
 			return fmt.Errorf("loading extension config: %w", err)
 		}
 	}
