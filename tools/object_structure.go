@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/feenlace/mcp-1c/onec"
@@ -49,7 +50,7 @@ func NewObjectStructureHandler(client *onec.Client) mcp.ToolHandler {
 			return nil, fmt.Errorf("object_type and object_name are required")
 		}
 
-		endpoint := fmt.Sprintf("/object/%s/%s", input.ObjectType, input.ObjectName)
+		endpoint := fmt.Sprintf("/object/%s/%s", url.PathEscape(input.ObjectType), url.PathEscape(input.ObjectName))
 		var obj onec.ObjectStructure
 		if err := client.Get(ctx, endpoint, &obj); err != nil {
 			return nil, fmt.Errorf("fetching object structure from 1C: %w", err)

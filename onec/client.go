@@ -75,7 +75,15 @@ func (c *Client) do(req *http.Request, result any) error {
 
 	// Limit response body to 50 MB to prevent OOM on unexpectedly large payloads.
 	const maxResponseSize = 50 << 20 // 50 MB
-	if err := json.NewDecoder(io.LimitReader(resp.Body, maxResponseSize)).Decode(result); err != nil {
+	limited := io.LimitReader(resp.Body, maxResponseSize+1)
+	data, err := io.ReadAll(limited)
+	if err != nil {
+		return fmt.Errorf("reading 1C response: %w", err)
+	}
+	if int64(len(data)) > maxResponseSize {
+		return fmt.Errorf("1C response exceeds 50 MB limit — use a more specific query or add LIMIT")
+	}
+	if err := json.Unmarshal(data, result); err != nil {
 		return fmt.Errorf("decoding 1C response: %w", err)
 	}
 	return nil
