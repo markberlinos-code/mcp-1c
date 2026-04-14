@@ -131,7 +131,7 @@ func openRealIndex(b *testing.B) *Index {
 		b.Skipf("dump directory %s does not exist, skipping benchmark", realDumpDir)
 	}
 
-	idx, err := NewIndex(realDumpDir, true)
+	idx, err := NewIndex(realDumpDir, "", true)
 	if err != nil {
 		b.Fatalf("NewIndex: %v", err)
 	}

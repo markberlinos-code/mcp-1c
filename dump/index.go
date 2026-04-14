@@ -216,7 +216,7 @@ type loadedModule struct {
 // NewIndex creates a new Index for the given dump directory. The index is built
 // asynchronously in a background goroutine and becomes available when Ready()
 // returns true. If reindex is true, any existing cache is discarded and rebuilt.
-func NewIndex(dir string, reindex bool) (*Index, error) {
+func NewIndex(dir, cacheDir string, reindex bool) (*Index, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	idx := &Index{
 		dir:           dir,
@@ -228,7 +228,7 @@ func NewIndex(dir string, reindex bool) (*Index, error) {
 		done:          make(chan struct{}),
 	}
 
-	cpath, cacheErr := cachePath(dir)
+	cpath, cacheErr := cachePath(dir, cacheDir)
 	useCache := cacheErr == nil
 
 	if useCache && reindex {

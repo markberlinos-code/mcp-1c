@@ -15,13 +15,17 @@ import (
 //	macOS: ~/Library/Caches/mcp-1c/<hash>
 //	Linux: ~/.cache/mcp-1c/<hash>  (or $XDG_CACHE_HOME)
 //	Windows: %LocalAppData%/mcp-1c/<hash>
-func cachePath(dumpDir string) (string, error) {
+func cachePath(dumpDir, cacheDir string) (string, error) {
 	absDir, err := filepath.Abs(dumpDir)
 	if err != nil {
 		return "", err
 	}
 	h := sha256.Sum256([]byte(absDir))
 	hash := hex.EncodeToString(h[:8]) // first 16 hex chars
+
+	if cacheDir != "" {
+		return filepath.Join(cacheDir, hash), nil
+	}
 
 	cacheBase, err := os.UserCacheDir()
 	if err != nil {

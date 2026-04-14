@@ -38,6 +38,7 @@ func main() {
 	user := flag.String("user", "", "1C HTTP service user")
 	password := flag.String("password", "", "1C HTTP service password")
 	dumpDir := flag.String("dump", "", "Path to DumpConfigToFiles output (enables search_code)")
+	cacheDir := flag.String("cache-dir", "", "Directory for index cache and logs (default: platform cache dir)")
 	reindex := flag.Bool("reindex", false, "Force rebuild of search index cache")
 	installDB := flag.String("install", "", "Install extension into 1C database at given path")
 	serverMode := flag.Bool("server", false, `Treat --install value as server connection string (server\database)`)
@@ -46,11 +47,15 @@ func main() {
 	dbPassword := flag.String("db-password", "", "1C database password for DESIGNER (install mode)")
 	flag.Parse()
 
+	if *cacheDir == "" {
+		*cacheDir = os.Getenv("MCP_1C_CACHE_DIR")
+	}
+
 	// When --debug is set, redirect logs to a file at INFO level.
 	// This avoids polluting stderr (which MCP clients show as errors)
 	// while still capturing useful diagnostic output.
 	if *debug {
-		if f, err := openDebugLog("mcp-1c"); err == nil {
+		if f, err := openDebugLog("mcp-1c", *cacheDir); err == nil {
 			log.SetOutput(f)
 			slog.SetDefault(slog.New(slog.NewTextHandler(f, &slog.HandlerOptions{Level: slog.LevelInfo})))
 			defer f.Close()
@@ -94,7 +99,7 @@ func main() {
 	var dumpIndex *dump.Index
 	if *dumpDir != "" {
 		var err error
-		dumpIndex, err = dump.NewIndex(*dumpDir, *reindex)
+		dumpIndex, err = dump.NewIndex(*dumpDir, *cacheDir, *reindex)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "loading dump from %s: %v\n", *dumpDir, err)
 			os.Exit(1)
@@ -117,12 +122,17 @@ func main() {
 //	macOS:   ~/Library/Caches/<name>/server.log
 //	Linux:   ~/.cache/<name>/server.log
 //	Windows: %LocalAppData%/<name>/server.log
-func openDebugLog(name string) (*os.File, error) {
-	cacheBase, err := os.UserCacheDir()
-	if err != nil {
-		return nil, err
+func openDebugLog(name, cacheDir string) (*os.File, error) {
+	var dir string
+	if cacheDir != "" {
+		dir = cacheDir
+	} else {
+		cacheBase, err := os.UserCacheDir()
+		if err != nil {
+			return nil, err
+		}
+		dir = filepath.Join(cacheBase, name)
 	}
-	dir := filepath.Join(cacheBase, name)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, err
 	}

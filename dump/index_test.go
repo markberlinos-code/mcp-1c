@@ -47,7 +47,7 @@ func TestNewIndex(t *testing.T) {
 	mkBSLFile(t, dir, "Documents/Реализация/Ext/ObjectModule.bsl",
 		"Процедура ОбработкаПроведения(Отказ)\n\t// проведение\nКонецПроцедуры\n")
 
-	idx, err := NewIndex(dir, false)
+	idx, err := NewIndex(dir, "", false)
 	if err != nil {
 		t.Fatalf("NewIndex: %v", err)
 	}
@@ -67,7 +67,7 @@ func TestIndex_SearchSmart(t *testing.T) {
 	mkBSLFile(t, dir, "Catalogs/Номенклатура/Ext/ObjectModule.bsl",
 		"Строка1\nПроцедура ОбновитьЦены()\n\t// обновление цен\nКонецПроцедуры\nСтрока5\n")
 
-	idx, err := NewIndex(dir, false)
+	idx, err := NewIndex(dir, "", false)
 	if err != nil {
 		t.Fatalf("NewIndex: %v", err)
 	}
@@ -103,7 +103,7 @@ func TestIndex_SearchSmartSynonym(t *testing.T) {
 	mkBSLFile(t, dir, "Catalogs/Тест/Ext/ObjectModule.bsl",
 		"Результат = СтрНайти(Строка, Подстрока);\n")
 
-	idx, err := NewIndex(dir, false)
+	idx, err := NewIndex(dir, "", false)
 	if err != nil {
 		t.Fatalf("NewIndex: %v", err)
 	}
@@ -133,7 +133,7 @@ func TestIndex_SearchRegex(t *testing.T) {
 	mkBSLFile(t, dir, "Catalogs/Тест/Ext/ObjectModule.bsl",
 		"Процедура Обработка1()\nКонецПроцедуры\nПроцедура Обработка2()\nКонецПроцедуры\n")
 
-	idx, err := NewIndex(dir, false)
+	idx, err := NewIndex(dir, "", false)
 	if err != nil {
 		t.Fatalf("NewIndex: %v", err)
 	}
@@ -162,7 +162,7 @@ func TestIndex_SearchRegexInvalid(t *testing.T) {
 	mkBSLFile(t, dir, "Catalogs/Тест/Ext/ObjectModule.bsl",
 		"Процедура Тест()\nКонецПроцедуры\n")
 
-	idx, err := NewIndex(dir, false)
+	idx, err := NewIndex(dir, "", false)
 	if err != nil {
 		t.Fatalf("NewIndex: %v", err)
 	}
@@ -184,7 +184,7 @@ func TestIndex_SearchExact(t *testing.T) {
 	mkBSLFile(t, dir, "Catalogs/Номенклатура/Ext/ObjectModule.bsl",
 		"Строка1\nПроцедура ОбновитьЦены()\n\t// обновление цен\nКонецПроцедуры\nСтрока5\n")
 
-	idx, err := NewIndex(dir, false)
+	idx, err := NewIndex(dir, "", false)
 	if err != nil {
 		t.Fatalf("NewIndex: %v", err)
 	}
@@ -219,7 +219,7 @@ func TestIndex_SearchCaseInsensitive(t *testing.T) {
 	mkBSLFile(t, dir, "Catalogs/Тест/Ext/ObjectModule.bsl",
 		"ПРОЦЕДУРА Тестирование()\nКонецПроцедуры\n")
 
-	idx, err := NewIndex(dir, false)
+	idx, err := NewIndex(dir, "", false)
 	if err != nil {
 		t.Fatalf("NewIndex: %v", err)
 	}
@@ -248,7 +248,7 @@ func TestIndex_SearchLimit(t *testing.T) {
 	mkBSLFile(t, dir, "Catalogs/Тест/Ext/ObjectModule.bsl",
 		"Строка1\nСтрока2\nСтрока3\nСтрока4\nСтрока5\n")
 
-	idx, err := NewIndex(dir, false)
+	idx, err := NewIndex(dir, "", false)
 	if err != nil {
 		t.Fatalf("NewIndex: %v", err)
 	}
@@ -278,7 +278,7 @@ func TestIndex_SearchCategoryFilter(t *testing.T) {
 	mkBSLFile(t, dir, "Documents/Реализация/Ext/ObjectModule.bsl",
 		"Процедура ОбщаяЛогика()\nКонецПроцедуры\n")
 
-	idx, err := NewIndex(dir, false)
+	idx, err := NewIndex(dir, "", false)
 	if err != nil {
 		t.Fatalf("NewIndex: %v", err)
 	}
@@ -312,7 +312,7 @@ func TestIndex_SearchModuleFilter(t *testing.T) {
 	mkBSLFile(t, dir, "Catalogs/Тест/Ext/ManagerModule.bsl",
 		"Процедура Общая()\nКонецПроцедуры\n")
 
-	idx, err := NewIndex(dir, false)
+	idx, err := NewIndex(dir, "", false)
 	if err != nil {
 		t.Fatalf("NewIndex: %v", err)
 	}
@@ -363,7 +363,7 @@ func TestIndex_Close(t *testing.T) {
 	dir := t.TempDir()
 	mkBSLFile(t, dir, "Catalogs/Тест/Ext/ObjectModule.bsl", "// empty\n")
 
-	idx, err := NewIndex(dir, false)
+	idx, err := NewIndex(dir, "", false)
 	if err != nil {
 		t.Fatalf("NewIndex: %v", err)
 	}
@@ -379,7 +379,7 @@ func TestIndex_Reindex(t *testing.T) {
 	mkBSLFile(t, dir, "Catalogs/Test/Ext/ObjectModule.bsl", "Процедура Тест()\nКонецПроцедуры")
 
 	// First build — creates cache.
-	idx1, err := NewIndex(dir, false)
+	idx1, err := NewIndex(dir, "", false)
 	if err != nil {
 		t.Fatalf("NewIndex (first build): %v", err)
 	}
@@ -390,7 +390,7 @@ func TestIndex_Reindex(t *testing.T) {
 	idx1.Close()
 
 	// Second open — uses cache.
-	idx2, err := NewIndex(dir, false)
+	idx2, err := NewIndex(dir, "", false)
 	if err != nil {
 		t.Fatalf("NewIndex (cached): %v", err)
 	}
@@ -401,7 +401,7 @@ func TestIndex_Reindex(t *testing.T) {
 	idx2.Close()
 
 	// Reindex — rebuilds.
-	idx3, err := NewIndex(dir, true)
+	idx3, err := NewIndex(dir, "", true)
 	if err != nil {
 		t.Fatalf("NewIndex (reindex): %v", err)
 	}
@@ -417,7 +417,7 @@ func TestIndex_SearchDefaultMode(t *testing.T) {
 	mkBSLFile(t, dir, "Catalogs/Тест/Ext/ObjectModule.bsl",
 		"Процедура Тест()\nКонецПроцедуры\n")
 
-	idx, err := NewIndex(dir, false)
+	idx, err := NewIndex(dir, "", false)
 	if err != nil {
 		t.Fatalf("NewIndex: %v", err)
 	}
@@ -440,7 +440,7 @@ func TestIndex_SearchDefaultMode(t *testing.T) {
 func TestIndex_Ready(t *testing.T) {
 	dir := t.TempDir()
 	mkBSLFile(t, dir, "Catalogs/Тест/Ext/ObjectModule.bsl", "// test\n")
-	idx, err := NewIndex(dir, false)
+	idx, err := NewIndex(dir, "", false)
 	if err != nil {
 		t.Fatalf("NewIndex: %v", err)
 	}
@@ -477,7 +477,7 @@ func TestIndex_NonBlockingBuild(t *testing.T) {
 	dir := t.TempDir()
 	mkBSLFile(t, dir, "Catalogs/Тест/Ext/ObjectModule.bsl", "Процедура Тест()\nКонецПроцедуры\n")
 
-	idx, err := NewIndex(dir, false)
+	idx, err := NewIndex(dir, "", false)
 	if err != nil {
 		t.Fatalf("NewIndex: %v", err)
 	}
@@ -500,7 +500,7 @@ func TestIndex_NonBlockingBuild(t *testing.T) {
 
 func TestIndex_EmptyDir(t *testing.T) {
 	dir := t.TempDir()
-	idx, err := NewIndex(dir, false)
+	idx, err := NewIndex(dir, "", false)
 	if err != nil {
 		t.Fatalf("NewIndex: %v", err)
 	}
@@ -517,7 +517,7 @@ func TestIndex_CloseWhileBuilding(t *testing.T) {
 		mkBSLFile(t, dir, fmt.Sprintf("Catalogs/Test%d/Ext/ObjectModule.bsl", i),
 			fmt.Sprintf("Процедура Тест%d()\nКонецПроцедуры\n", i))
 	}
-	idx, err := NewIndex(dir, false)
+	idx, err := NewIndex(dir, "", false)
 	if err != nil {
 		t.Fatalf("NewIndex: %v", err)
 	}
@@ -536,7 +536,7 @@ func TestIndex_IndexDoc(t *testing.T) {
 	dir := t.TempDir()
 	mkBSLFile(t, dir, "Catalogs/Тест/Ext/ObjectModule.bsl", "Процедура Тест()\nКонецПроцедуры\n")
 
-	idx, err := NewIndex(dir, false)
+	idx, err := NewIndex(dir, "", false)
 	if err != nil {
 		t.Fatalf("NewIndex: %v", err)
 	}
@@ -572,7 +572,7 @@ func TestIndex_DeleteDoc(t *testing.T) {
 	dir := t.TempDir()
 	mkBSLFile(t, dir, "Catalogs/Тест/Ext/ObjectModule.bsl", "Процедура Удаляемая()\nКонецПроцедуры\n")
 
-	idx, err := NewIndex(dir, false)
+	idx, err := NewIndex(dir, "", false)
 	if err != nil {
 		t.Fatalf("NewIndex: %v", err)
 	}
@@ -654,7 +654,7 @@ func TestIndex_IndexDoc_RegexVisible(t *testing.T) {
 	dir := t.TempDir()
 	mkBSLFile(t, dir, "Catalogs/Тест/Ext/ObjectModule.bsl", "Процедура Тест()\nКонецПроцедуры\n")
 
-	idx, err := NewIndex(dir, false)
+	idx, err := NewIndex(dir, "", false)
 	if err != nil {
 		t.Fatalf("NewIndex: %v", err)
 	}
@@ -687,7 +687,7 @@ func TestIndex_IndexDoc_Dedup(t *testing.T) {
 	dir := t.TempDir()
 	mkBSLFile(t, dir, "Catalogs/Тест/Ext/ObjectModule.bsl", "Процедура Тест() КонецПроцедуры")
 
-	idx, err := NewIndex(dir, false)
+	idx, err := NewIndex(dir, "", false)
 	if err != nil {
 		t.Fatalf("NewIndex: %v", err)
 	}
@@ -711,7 +711,7 @@ func TestIndex_GetContent(t *testing.T) {
 	dir := t.TempDir()
 	mkBSLFile(t, dir, "Catalogs/Номенклатура/Ext/ObjectModule.bsl",
 		"Процедура ПередЗаписью(Отказ)\n\t// проверка\nКонецПроцедуры\n")
-	idx, err := NewIndex(dir, false)
+	idx, err := NewIndex(dir, "", false)
 	if err != nil {
 		t.Fatalf("NewIndex: %v", err)
 	}
@@ -749,7 +749,7 @@ func TestIndex_GetContent_NotReady(t *testing.T) {
 func TestIndex_GetContent_NotFound(t *testing.T) {
 	dir := t.TempDir()
 	mkBSLFile(t, dir, "Catalogs/Тест/Ext/ObjectModule.bsl", "// test\n")
-	idx, err := NewIndex(dir, false)
+	idx, err := NewIndex(dir, "", false)
 	if err != nil {
 		t.Fatalf("NewIndex: %v", err)
 	}
@@ -764,7 +764,7 @@ func TestIndex_GetContent_NotFound(t *testing.T) {
 func TestIndex_IndexDocWithMeta(t *testing.T) {
 	dir := t.TempDir()
 	mkBSLFile(t, dir, "Catalogs/Тест/Ext/ObjectModule.bsl", "Процедура Тест()\nКонецПроцедуры\n")
-	idx, err := NewIndex(dir, false)
+	idx, err := NewIndex(dir, "", false)
 	if err != nil {
 		t.Fatalf("NewIndex: %v", err)
 	}
@@ -833,7 +833,7 @@ func TestIndex_IndexDocWithMeta_NotReady(t *testing.T) {
 func TestIndex_IndexDocWithMeta_Dedup(t *testing.T) {
 	dir := t.TempDir()
 	mkBSLFile(t, dir, "Catalogs/Тест/Ext/ObjectModule.bsl", "// test\n")
-	idx, err := NewIndex(dir, false)
+	idx, err := NewIndex(dir, "", false)
 	if err != nil {
 		t.Fatalf("NewIndex: %v", err)
 	}
@@ -859,7 +859,7 @@ func TestIndex_IndexDocWithMeta_Dedup(t *testing.T) {
 func TestIndex_Done(t *testing.T) {
 	dir := t.TempDir()
 	mkBSLFile(t, dir, "Catalogs/Тест/Ext/ObjectModule.bsl", "// test\n")
-	idx, err := NewIndex(dir, false)
+	idx, err := NewIndex(dir, "", false)
 	if err != nil {
 		t.Fatalf("NewIndex: %v", err)
 	}
@@ -876,7 +876,7 @@ func TestIndex_Done(t *testing.T) {
 
 func TestIndex_Done_EmptyDir(t *testing.T) {
 	dir := t.TempDir()
-	idx, err := NewIndex(dir, false)
+	idx, err := NewIndex(dir, "", false)
 	if err != nil {
 		t.Fatalf("NewIndex: %v", err)
 	}
@@ -892,7 +892,7 @@ func TestIndex_DeleteDoc_RemovesFromNames(t *testing.T) {
 	dir := t.TempDir()
 	mkBSLFile(t, dir, "Catalogs/Тест/Ext/ObjectModule.bsl", "Процедура Удаляемая()\nКонецПроцедуры\n")
 
-	idx, err := NewIndex(dir, false)
+	idx, err := NewIndex(dir, "", false)
 	if err != nil {
 		t.Fatalf("NewIndex: %v", err)
 	}
