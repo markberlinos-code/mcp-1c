@@ -119,3 +119,36 @@ type EventLogEntry struct {
 	Comment     string `json:"comment,omitempty"`
 	Transaction string `json:"transaction,omitempty"`
 }
+
+// ExecuteRequest is the request body for the /execute endpoint.
+type ExecuteRequest struct {
+	Code string `json:"code"`
+}
+
+// ExecuteResult is the response from the /execute endpoint.
+type ExecuteResult struct {
+	Success    bool     `json:"success"`
+	Output     []string `json:"output"`
+	Error      string   `json:"error,omitempty"`
+	DurationMs int      `json:"duration_ms"`
+}
+
+// WriteRequest is the request body for the /write endpoint.
+type WriteRequest struct {
+	Type   string         `json:"type"`
+	Search WriteSearch    `json:"search"`
+	Fields map[string]any `json:"fields"`
+}
+
+// WriteSearch specifies how to find the object to update.
+type WriteSearch struct {
+	Field string `json:"field"`
+	Value any    `json:"value"`
+}
+
+// WriteResult is the response from the /write endpoint.
+type WriteResult struct {
+	Success       bool   `json:"success"`
+	UpdatedFields int    `json:"updated_fields"`
+	Ref           string `json:"ref"`
+}
